@@ -2,19 +2,24 @@ package app.pixelflow.player
 
 import android.Manifest
 import android.app.Activity
+import android.content.ContentUris
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.ContentUris
 import android.database.Cursor
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -26,81 +31,124 @@ import androidx.media3.ui.PlayerView
 import java.util.Locale
 
 class MainActivity : Activity() {
-    private val bg = Color.rgb(15, 17, 22)
-    private val panel = Color.rgb(25, 28, 36)
-    private val accent = Color.rgb(150, 130, 255)
-    private val muted = Color.rgb(153, 157, 172)
+    private val bg = Color.rgb(16, 17, 20)
+    private val surface = Color.rgb(29, 30, 35)
+    private val surfaceAlt = Color.rgb(38, 39, 45)
+    private val accent = Color.rgb(196, 181, 253)
+    private val accentInk = Color.rgb(36, 25, 72)
+    private val textPrimary = Color.rgb(245, 244, 250)
+    private val muted = Color.rgb(166, 166, 178)
+
     private lateinit var status: TextView
     private lateinit var libraryCount: TextView
     private lateinit var libraryList: LinearLayout
     private lateinit var playerView: PlayerView
+    private lateinit var searchInput: EditText
+    private lateinit var videosTab: TextView
+    private lateinit var foldersTab: TextView
+    private lateinit var folderBack: TextView
     private var player: ExoPlayer? = null
+    private var allVideos: List<VideoEntry> = emptyList()
+    private var activeTab = "videos"
+    private var selectedFolder: String? = null
+    private var searchQuery = ""
 
     private data class VideoEntry(
         val uri: Uri,
+        val id: Long,
         val name: String,
         val durationMs: Long,
-        val sizeBytes: Long
+        val sizeBytes: Long,
+        val folder: String
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = bg
         window.navigationBarColor = bg
+        window.decorView.systemUiVisibility = 0
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(22), dp(18), dp(12))
+            setPadding(dp(20), dp(18), dp(20), dp(8))
             setBackgroundColor(bg)
         }
 
-        root.addView(TextView(this).apply {
-            text = "PixelFlow"
-            textSize = 30f
-            setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.create("sans-serif-medium", 0)
-        })
-        root.addView(TextView(this).apply {
-            text = "YOUR MEDIA, YOUR FLOW"
-            textSize = 11f
-            letterSpacing = .16f
-            setTextColor(muted)
-            setPadding(0, dp(3), 0, dp(14))
-        })
-
-        // Keep a compact player above the library so videos remain easy to browse.
-        playerView = layoutInflater.inflate(R.layout.pixel_player_view, root, false) as PlayerView
-        root.addView(playerView, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(205)
-        ))
-
-        status = TextView(this).apply {
-            text = "Choose a video to start playback"
-            textSize = 12f
-            setTextColor(muted)
-            setPadding(0, dp(10), 0, dp(8))
-        }
-        root.addView(status)
-
-        val actions = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
-        actions.addView(makeButton("Open video") { openVideoPicker() },
-            LinearLayout.LayoutParams(0, dp(46), 1f))
-        actions.addView(View(this), LinearLayout.LayoutParams(dp(10), 1))
-        actions.addView(makeButton("Refresh") { loadLibrary() },
-            LinearLayout.LayoutParams(0, dp(46), 1f))
-        root.addView(actions)
-
-        val libraryHeader = LinearLayout(this).apply {
+        val toolbar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(18), 0, dp(8))
         }
-        libraryHeader.addView(TextView(this).apply {
-            text = "Video library"
+        val brand = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+        brand.addView(TextView(this).apply {
+            text = "PixelFlow"
+            textSize = 27f
+            setTextColor(textPrimary)
+            typeface = android.graphics.Typeface.create("sans-serif-medium", 0)
+            letterSpacing = -.025f
+        })
+        brand.addView(TextView(this).apply {
+            text = "YOUR VIDEO SPACE"
+            textSize = 10f
+            letterSpacing = .16f
+            setTextColor(muted)
+            setPadding(1, dp(1), 0, 0)
+        })
+        toolbar.addView(brand, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        toolbar.addView(makeActionButton("+", "Open a video") { openVideoPicker() }, LinearLayout.LayoutParams(dp(46), dp(46)))
+        root.addView(toolbar)
+
+        searchInput = EditText(this).apply {
+            hint = "Search videos and folders"
+            textSize = 14f
+            singleLine = true
+            setTextColor(textPrimary)
+            setHintTextColor(muted)
+            setPadding(dp(15), 0, dp(12), 0)
+            background = roundedBackground(surface, dp(16))
+            compoundDrawablePadding = dp(8)
+        }
+        val searchParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50))
+        searchParams.topMargin = dp(20)
+        root.addView(searchInput, searchParams)
+
+        val tabs = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(14), 0, dp(10))
+        }
+        videosTab = makeTab("Videos") { activeTab = "videos"; selectedFolder = null; renderLibrary() }
+        foldersTab = makeTab("Folders") { activeTab = "folders"; selectedFolder = null; renderLibrary() }
+        tabs.addView(videosTab, LinearLayout.LayoutParams(0, dp(40), 1f).apply { marginEnd = dp(8) })
+        tabs.addView(foldersTab, LinearLayout.LayoutParams(0, dp(40), 1f))
+        root.addView(tabs)
+
+        folderBack = TextView(this).apply {
+            text = "‹   All folders"
+            textSize = 13f
+            setTextColor(accent)
+            setPadding(0, dp(4), 0, dp(8))
+            visibility = View.GONE
+            setOnClickListener { selectedFolder = null; renderLibrary() }
+        }
+        root.addView(folderBack)
+
+        playerView = layoutInflater.inflate(R.layout.pixel_player_view, root, false) as PlayerView
+        playerView.visibility = View.GONE
+        val playerParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(210))
+        playerParams.bottomMargin = dp(12)
+        root.addView(playerView, playerParams)
+
+        val listHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(6), 0, dp(10))
+        }
+        listHeader.addView(TextView(this).apply {
+            text = "Your library"
             textSize = 19f
-            setTextColor(Color.WHITE)
+            setTextColor(textPrimary)
             typeface = android.graphics.Typeface.create("sans-serif-medium", 0)
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         libraryCount = TextView(this).apply {
@@ -108,154 +156,265 @@ class MainActivity : Activity() {
             textSize = 12f
             setTextColor(muted)
         }
-        libraryHeader.addView(libraryCount)
-        root.addView(libraryHeader)
+        listHeader.addView(libraryCount)
+        root.addView(listHeader)
 
         val scroll = ScrollView(this).apply {
             isFillViewport = true
             clipToPadding = false
+            setVerticalScrollBarEnabled(false)
         }
-        libraryList = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        libraryList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scroll.addView(libraryList, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ))
-        root.addView(scroll, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-        ))
+        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
-        root.addView(TextView(this).apply {
-            text = "Media3 playback · mpv integration is still in progress"
-            textSize = 10f
+        status = TextView(this).apply {
+            text = "Choose a video to start playback"
+            textSize = 11f
             gravity = Gravity.CENTER
-            setTextColor(Color.rgb(120, 124, 139))
-            setPadding(0, dp(10), 0, 0)
-        })
+            setTextColor(muted)
+            setPadding(0, dp(10), 0, dp(5))
+        }
+        root.addView(status)
         setContentView(root)
 
-        if (hasVideoPermission()) {
-            loadLibrary()
-        } else {
-            requestVideoPermission()
-        }
+        searchInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                searchQuery = s?.toString()?.trim().orEmpty()
+                renderLibrary()
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
+
+        if (hasVideoPermission()) loadLibrary() else requestVideoPermission()
     }
 
-    private fun makeButton(label: String, action: () -> Unit): Button =
-        Button(this).apply {
+    private fun makeTab(label: String, action: () -> Unit): TextView =
+        TextView(this).apply {
             text = label
-            textSize = 13f
-            isAllCaps = false
-            setTextColor(Color.WHITE)
-            backgroundTintList = android.content.res.ColorStateList.valueOf(accent)
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(textPrimary)
+            typeface = android.graphics.Typeface.create("sans-serif-medium", 0)
             setOnClickListener { action() }
         }
 
-    private fun hasVideoPermission(): Boolean {
-        val permission = if (Build.VERSION.SDK_INT >= 33) {
-            Manifest.permission.READ_MEDIA_VIDEO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+    private fun makeActionButton(label: String, description: String, action: () -> Unit): TextView =
+        TextView(this).apply {
+            text = label
+            contentDescription = description
+            textSize = 26f
+            gravity = Gravity.CENTER
+            setTextColor(accentInk)
+            background = roundedBackground(accent, dp(16))
+            setOnClickListener { action() }
         }
+
+    private fun roundedBackground(color: Int, radius: Int): android.graphics.drawable.GradientDrawable =
+        android.graphics.drawable.GradientDrawable().apply {
+            setColor(color)
+            cornerRadius = radius.toFloat()
+        }
+
+    private fun hasVideoPermission(): Boolean {
+        val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_VIDEO
+        else Manifest.permission.READ_EXTERNAL_STORAGE
         return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun requestVideoPermission() {
-        val permission = if (Build.VERSION.SDK_INT >= 33) {
-            Manifest.permission.READ_MEDIA_VIDEO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
+        val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_VIDEO
+        else Manifest.permission.READ_EXTERNAL_STORAGE
         requestPermissions(arrayOf(permission), 202)
     }
 
     @Deprecated("Deprecated by Android, retained for compatibility")
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode != 202) return
-        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            loadLibrary()
-        } else {
+        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) loadLibrary()
+        else {
             libraryCount.text = "Permission needed"
-            showLibraryMessage("Allow video access to browse videos stored on your device.")
+            showLibraryMessage("Allow video access to browse videos on your device.")
         }
     }
 
     private fun loadLibrary() {
-        if (!hasVideoPermission()) {
-            requestVideoPermission()
-            return
-        }
+        if (!hasVideoPermission()) { requestVideoPermission(); return }
         libraryCount.text = "Scanning…"
-        libraryList.removeAllViews()
         val videos = mutableListOf<VideoEntry>()
         val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Video.Media._ID,
             MediaStore.Video.Media.DISPLAY_NAME,
             MediaStore.Video.Media.DURATION,
-            MediaStore.Video.Media.SIZE
+            MediaStore.Video.Media.SIZE,
+            MediaStore.Video.Media.BUCKET_DISPLAY_NAME
         )
-        val sortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
         try {
-            contentResolver.query(collection, projection, null, null, sortOrder)?.use { cursor ->
-                val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-                val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-                val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
-                val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+            contentResolver.query(collection, projection, null, null, "${MediaStore.Video.Media.DATE_ADDED} DESC")?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+                val folderCol = cursor.getColumnIndex(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
                 while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idColumn)
+                    val id = cursor.getLong(idCol)
                     videos.add(VideoEntry(
                         ContentUris.withAppendedId(collection, id),
-                        cursor.getString(nameColumn) ?: "Untitled video",
-                        cursor.getLong(durationColumn),
-                        cursor.getLong(sizeColumn)
+                        id,
+                        cursor.getString(nameCol) ?: "Untitled video",
+                        cursor.getLong(durationCol),
+                        cursor.getLong(sizeCol),
+                        if (folderCol >= 0) cursor.getString(folderCol) ?: "Other" else "Other"
                     ))
                 }
             }
         } catch (_: Exception) {
             libraryCount.text = "Unable to scan"
-            showLibraryMessage("Could not read the device video library. Tap Refresh to try again.")
+            showLibraryMessage("Could not read the video library. Tap Refresh to try again.")
             return
         }
+        allVideos = videos
+        renderLibrary()
+    }
 
-        libraryCount.text = "${videos.size} video" + if (videos.size == 1) "" else "s"
-        if (videos.isEmpty()) {
-            showLibraryMessage("No videos found on this device. Use Open video to choose one from Files.")
+    private fun renderLibrary() {
+        if (!::libraryList.isInitialized) return
+        libraryList.removeAllViews()
+        videosTab.setBackground(if (activeTab == "videos") roundedBackground(surfaceAlt, dp(14)) else roundedBackground(bg, dp(14)))
+        foldersTab.setBackground(if (activeTab == "folders") roundedBackground(surfaceAlt, dp(14)) else roundedBackground(bg, dp(14)))
+        videosTab.setTextColor(if (activeTab == "videos") accent else muted)
+        foldersTab.setTextColor(if (activeTab == "folders") accent else muted)
+        folderBack.visibility = if (selectedFolder != null) View.VISIBLE else View.GONE
+
+        val filtered = allVideos.filter {
+            (selectedFolder == null || it.folder == selectedFolder) &&
+                (searchQuery.isBlank() || it.name.contains(searchQuery, true) || it.folder.contains(searchQuery, true))
+        }
+        libraryCount.text = if (activeTab == "folders" && selectedFolder == null) {
+            "${filtered.map { it.folder }.distinct().size} folders"
+        } else "${filtered.size} videos"
+
+        if (allVideos.isEmpty()) {
+            showLibraryMessage("No videos found yet. Add a video to your device or tap + to open one from Files.")
             return
         }
-        videos.forEach { video -> addVideoRow(video) }
+        if (activeTab == "folders" && selectedFolder == null) {
+            val groups = filtered.groupBy { it.folder }.toSortedMap(String.CASE_INSENSITIVE_ORDER)
+            if (groups.isEmpty()) { showLibraryMessage("No matching folders."); return }
+            groups.forEach { (folder, entries) -> addFolderRow(folder, entries.size) }
+        } else {
+            if (filtered.isEmpty()) { showLibraryMessage("No matching videos. Try another search."); return }
+            filtered.forEach { addVideoRow(it) }
+        }
+    }
+
+    private fun addFolderRow(folder: String, count: Int) {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(15), dp(15), dp(14), dp(15))
+            background = roundedBackground(surface, dp(17))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener {
+                selectedFolder = folder
+                activeTab = "videos"
+                renderLibrary()
+            }
+        }
+        row.addView(TextView(this).apply {
+            text = "▰"
+            textSize = 24f
+            gravity = Gravity.CENTER
+            setTextColor(accent)
+            background = roundedBackground(surfaceAlt, dp(13))
+        }, LinearLayout.LayoutParams(dp(52), dp(52)))
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(13), 0, 0, 0)
+            addView(TextView(this@MainActivity).apply {
+                text = folder
+                textSize = 15f
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setTextColor(textPrimary)
+                typeface = android.graphics.Typeface.create("sans-serif-medium", 0)
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "$count videos"
+                textSize = 12f
+                setTextColor(muted)
+                setPadding(0, dp(4), 0, 0)
+            })
+        }
+        row.addView(info, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(TextView(this).apply { text = "›"; textSize = 28f; setTextColor(muted) })
+        libraryList.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(9)
+        })
     }
 
     private fun addVideoRow(video: VideoEntry) {
         val row = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            setBackgroundColor(panel)
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(10), dp(12), dp(10))
+            background = roundedBackground(surface, dp(17))
             isClickable = true
             isFocusable = true
             setOnClickListener { startPlayback(video.uri, video.name) }
         }
-        row.addView(TextView(this).apply {
+        val thumbnail = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            background = roundedBackground(surfaceAlt, dp(12))
+            setImageDrawable(null)
+            try {
+                val bitmap: Bitmap? = if (Build.VERSION.SDK_INT >= 29) {
+                    contentResolver.loadThumbnail(video.uri, android.util.Size(dp(104), dp(72)), null)
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Video.Thumbnails.getThumbnail(contentResolver, video.id, MediaStore.Video.Thumbnails.MINI_KIND, null)
+                }
+                if (bitmap != null) setImageBitmap(bitmap) else setImageResource(android.R.drawable.ic_media_play)
+            } catch (_: Exception) {
+                setImageResource(android.R.drawable.ic_media_play)
+            }
+        }
+        row.addView(thumbnail, LinearLayout.LayoutParams(dp(104), dp(72)))
+        val info = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, dp(4), 0)
+        }
+        info.addView(TextView(this).apply {
             text = video.name
             textSize = 14f
             maxLines = 2
-            setTextColor(Color.WHITE)
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setTextColor(textPrimary)
             typeface = android.graphics.Typeface.create("sans-serif-medium", 0)
         })
-        row.addView(TextView(this).apply {
+        info.addView(TextView(this).apply {
             text = "${formatDuration(video.durationMs)}  ·  ${formatSize(video.sizeBytes)}"
             textSize = 11f
             setTextColor(muted)
             setPadding(0, dp(5), 0, 0)
         })
-        libraryList.addView(row, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { bottomMargin = dp(8) })
+        info.addView(TextView(this).apply {
+            text = video.folder
+            textSize = 10f
+            maxLines = 1
+            setTextColor(muted)
+            setPadding(0, dp(4), 0, 0)
+        })
+        row.addView(info, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        libraryList.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(9)
+        })
     }
 
     private fun showLibraryMessage(message: String) {
@@ -264,17 +423,17 @@ class MainActivity : Activity() {
             text = message
             textSize = 13f
             setTextColor(muted)
-            setPadding(dp(4), dp(14), dp(4), dp(18))
+            setPadding(dp(4), dp(18), dp(4), dp(20))
         })
     }
 
     private fun formatDuration(ms: Long): String {
-        val totalSeconds = (ms / 1000).coerceAtLeast(0)
-        val hours = totalSeconds / 3600
-        val minutes = (totalSeconds % 3600) / 60
-        val seconds = totalSeconds % 60
-        return if (hours > 0) String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
-        else String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
+        val seconds = (ms / 1000).coerceAtLeast(0)
+        val h = seconds / 3600
+        val m = (seconds % 3600) / 60
+        val s = seconds % 60
+        return if (h > 0) String.format(Locale.getDefault(), "%d:%02d:%02d", h, m, s)
+        else String.format(Locale.getDefault(), "%d:%02d", m, s)
     }
 
     private fun formatSize(bytes: Long): String {
@@ -288,9 +447,8 @@ class MainActivity : Activity() {
             type = "video/*"
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
-        try {
-            startActivityForResult(intent, 101)
-        } catch (_: Exception) {
+        try { startActivityForResult(intent, 101) }
+        catch (_: Exception) {
             startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).apply {
                 type = "video/*"
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -300,6 +458,7 @@ class MainActivity : Activity() {
 
     private fun startPlayback(uri: Uri, name: String? = null) {
         player?.release()
+        playerView.visibility = View.VISIBLE
         status.text = "Loading video…"
         val newPlayer = ExoPlayer.Builder(this).build()
         player = newPlayer
@@ -308,12 +467,11 @@ class MainActivity : Activity() {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 status.text = when (playbackState) {
                     Player.STATE_BUFFERING -> "Loading video…"
-                    Player.STATE_READY -> if (newPlayer.playWhenReady) "Playing: ${name ?: "selected video"}" else "Ready to play"
+                    Player.STATE_READY -> if (newPlayer.playWhenReady) "Now playing · ${name ?: "selected video"}" else "Ready to play"
                     Player.STATE_ENDED -> "Playback finished"
                     else -> status.text
                 }
             }
-
             override fun onPlayerError(error: PlaybackException) {
                 status.text = "Playback error: ${error.errorCodeName}"
             }
@@ -328,11 +486,8 @@ class MainActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != 101 || resultCode != RESULT_OK) return
         val uri = data?.data ?: return
-        try {
-            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        } catch (_: Exception) {
-            // Some providers grant temporary read access only.
-        }
+        try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+        catch (_: Exception) { }
         startPlayback(uri)
     }
 

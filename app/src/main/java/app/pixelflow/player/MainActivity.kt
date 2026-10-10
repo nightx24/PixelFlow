@@ -130,7 +130,7 @@ class MainActivity : Activity() {
             setTextColor(accent)
             setPadding(0, dp(4), 0, dp(8))
             visibility = View.GONE
-            setOnClickListener { selectedFolder = null; renderLibrary() }
+            setOnClickListener { selectedFolder = null; activeTab = "folders"; renderLibrary() }
         }
         root.addView(folderBack)
 

@@ -1,6 +1,6 @@
 # PixelFlow
 
-A minimal dark video-player project targeting Linux and Android, inspired by NextPlayer and intended to use mpv/libmpv.
+A minimal video-player project targeting Linux and Android, inspired by NextPlayer and intended to use mpv/libmpv.
 
 ## Current status
 This is the first scaffold, not a completed media player. The Android build produces a UI prototype APK; video playback, subtitle controls, resume position, playlists, media library, and native libmpv packaging still need implementation. No successful build is claimed until GitHub Actions completes.

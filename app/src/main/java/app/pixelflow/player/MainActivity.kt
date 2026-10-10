@@ -14,7 +14,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 
 class MainActivity : Activity() {
@@ -49,14 +48,8 @@ class MainActivity : Activity() {
             setPadding(0, dp(4), 0, dp(20))
         })
 
-        playerView = PlayerView(this).apply {
-            setBackgroundColor(Color.BLACK)
-            useController = true
-            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-            setShutterBackgroundColor(Color.BLACK)
-            setKeepContentOnPlayerReset(true)
-            setSurfaceType(PlayerView.SURFACE_TYPE_TEXTURE_VIEW)
-        }
+        // Inflate from XML because Media3 configures surface_type through XML attributes.
+        playerView = layoutInflater.inflate(R.layout.pixel_player_view, root, false) as PlayerView
         root.addView(playerView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))

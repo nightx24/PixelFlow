@@ -118,7 +118,7 @@ class MainActivity : Activity() {
         libraryList = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
-        scroll.addView(libraryList, ScrollView.LayoutParams(
+        scroll.addView(libraryList, ViewGroup.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ))
         root.addView(scroll, LinearLayout.LayoutParams(

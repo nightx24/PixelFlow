@@ -10,17 +10,20 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.VideoView
-import android.widget.MediaController
-import android.widget.FrameLayout
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 
 class MainActivity : Activity() {
     private val bg = Color.rgb(15, 17, 22)
-    private val panel = Color.rgb(26, 29, 37)
     private val accent = Color.rgb(150, 130, 255)
     private var selectedVideo: Uri? = null
     private lateinit var status: TextView
-    private lateinit var videoView: VideoView
+    private lateinit var playerView: PlayerView
+    private var player: ExoPlayer? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,15 +49,15 @@ class MainActivity : Activity() {
             setPadding(0, dp(4), 0, dp(20))
         })
 
-        val videoContainer = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
-        videoView = VideoView(this).apply {
+        playerView = PlayerView(this).apply {
             setBackgroundColor(Color.BLACK)
-            setMediaController(MediaController(this@MainActivity))
+            useController = true
+            resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+            setShutterBackgroundColor(Color.BLACK)
+            setKeepContentOnPlayerReset(true)
+            setSurfaceType(PlayerView.SURFACE_TYPE_TEXTURE_VIEW)
         }
-        videoContainer.addView(videoView, FrameLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-        ))
-        root.addView(videoContainer, LinearLayout.LayoutParams(
+        root.addView(playerView, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
         ))
 
@@ -72,7 +75,7 @@ class MainActivity : Activity() {
             setOnClickListener { openVideoPicker() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(52)))
         root.addView(TextView(this).apply {
-            text = "Basic playback enabled · mpv integration is still in progress"
+            text = "Media3 playback · mpv integration is still in progress"
             textSize = 11f
             gravity = Gravity.CENTER
             setTextColor(Color.rgb(120, 124, 139))
@@ -97,6 +100,31 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun startPlayback(uri: Uri) {
+        player?.release()
+        status.text = "Loading video…"
+        val newPlayer = ExoPlayer.Builder(this).build()
+        player = newPlayer
+        playerView.player = newPlayer
+        newPlayer.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                status.text = when (playbackState) {
+                    Player.STATE_BUFFERING -> "Loading video…"
+                    Player.STATE_READY -> if (newPlayer.playWhenReady) "Playing video" else "Ready to play"
+                    Player.STATE_ENDED -> "Playback finished"
+                    else -> status.text
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                status.text = "Playback error: ${error.errorCodeName}"
+            }
+        })
+        newPlayer.setMediaItem(MediaItem.fromUri(uri))
+        newPlayer.prepare()
+        newPlayer.playWhenReady = true
+    }
+
     @Deprecated("Deprecated by Android, retained for compatibility")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
@@ -106,22 +134,21 @@ class MainActivity : Activity() {
         try {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         } catch (_: Exception) {
-            // Some document providers grant temporary read access only.
+            // Some providers grant temporary read access only.
         }
-        status.text = "Loading selected video…"
-        videoView.setVideoURI(uri)
-        videoView.setOnPreparedListener { player ->
-            player.isLooping = false
-            videoView.start()
-            status.text = "Playing video"
-        }
-        videoView.setOnErrorListener { _, what, extra ->
-            status.text = "Can't play this format (error $what/$extra)"
-            true
-        }
-        videoView.setOnCompletionListener {
-            status.text = "Playback finished"
-        }
+        startPlayback(uri)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        player?.pause()
+    }
+
+    override fun onDestroy() {
+        playerView.player = null
+        player?.release()
+        player = null
+        super.onDestroy()
     }
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

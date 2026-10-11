@@ -7,11 +7,11 @@ import {
   Folder as FolderIcon, 
   Play, 
   ChevronRight, 
-  X,
-  History,
-  RotateCcw,
-  Clock,
-  ArrowUpDown
+  X, 
+  Clock, 
+  ArrowUpDown,
+  Tv,
+  Film
 } from 'lucide-react';
 import { 
   VideoEntry, 
@@ -28,7 +28,8 @@ import {
   formatDuration, 
   formatSize, 
   DEFAULT_PIXELFLOW_SETTINGS, 
-  ACCENT_COLORS 
+  getAccentPalette,
+  getMaterialYouSurfaces
 } from './utils.ts';
 import { PlayerView } from './components/PlayerView.tsx';
 import { QuickSettingsModal } from './components/QuickSettingsModal.tsx';
@@ -91,7 +92,19 @@ export default function App() {
 
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const accent = ACCENT_COLORS[settings.appearance.accentColor] || ACCENT_COLORS.lavender;
+  // Dynamic Accent Palette & Material You (M3) calculation
+  const accent = useMemo(() => {
+    return getAccentPalette(settings.appearance.accentColor, settings.appearance.customAccentHex);
+  }, [settings.appearance.accentColor, settings.appearance.customAccentHex]);
+
+  const isLight = settings.appearance.themeMode === 'light';
+  const isMaterialYou = settings.appearance.themeMode === 'material-you';
+  const isAMOLED = settings.appearance.themeMode === 'amoled';
+  const isGlass = settings.appearance.enableGlassUI;
+
+  const m3Surfaces = useMemo(() => {
+    return getMaterialYouSurfaces(accent, isLight);
+  }, [accent, isLight]);
 
   // Persist settings
   useEffect(() => {
@@ -140,60 +153,78 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchVisible, isQuickSettingsOpen, isSettingsOpen, isAddVideoOpen]);
 
-  // Desktop integration (Ubuntu, Fedora, AppImage, Windows)
+  // Listen to Electron file associations if packaged
   useEffect(() => {
     if (window.electronAPI?.onOpenVideo) {
       const cleanup = window.electronAPI.onOpenVideo((data) => {
-        const desktopVideo: VideoEntry = {
-          id: `desktop-${Date.now()}`,
+        const ext = data.fileName.split('.').pop() || 'mp4';
+        const newVideo: VideoEntry = {
+          id: `ext-${Date.now()}`,
           name: data.fileName,
-          url: data.filePath.startsWith('file:') ? data.filePath : `file://${data.filePath}`,
-          durationMs: 0,
-          sizeBytes: 0,
-          folder: 'Local Files',
+          url: data.filePath.startsWith('file://') ? data.filePath : `file://${data.filePath}`,
+          durationMs: 60000,
+          sizeBytes: 15000000,
+          folder: 'External',
+          dateAdded: Date.now(),
           isCustom: true,
         };
-        setVideos((prev) => [desktopVideo, ...prev]);
-        setActiveVideo(desktopVideo);
-        setStatusMessage(`Now playing · ${data.fileName}`);
+        setVideos((prev) => [newVideo, ...prev]);
+        setActiveVideo(newVideo);
+        setStatusMessage(`Opened ${data.fileName}`);
       });
       return cleanup;
     }
   }, []);
 
-  // Unique folders
   const allFolderNames = useMemo(() => {
     const set = new Set<string>();
-    videos.forEach((v) => set.add(v.folder || 'Other'));
+    videos.forEach((v) => {
+      if (v.folder) set.add(v.folder);
+    });
     return Array.from(set).sort();
   }, [videos]);
 
-  // Filtered and Sorted Videos
+  // Filtered & Sorted Videos
   const filteredVideos = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    let result = videos.filter((v) => {
-      const folderMatches = selectedFolder === null || v.folder === selectedFolder;
-      const queryMatches = !q || v.name.toLowerCase().includes(q) || v.folder.toLowerCase().includes(q);
-      const durationMatches = !settings.library.excludeShortVideos || v.durationMs >= (settings.library.shortVideoThresholdSec * 1000);
-      return folderMatches && queryMatches && durationMatches;
-    });
+    let result = [...videos];
 
-    // Apply sorting
-    const field = settings.library.sortField;
-    const order = settings.library.sortOrder === 'asc' ? 1 : -1;
+    // Filter by selected folder if in folder sub-view
+    if (selectedFolder) {
+      result = result.filter((v) => v.folder === selectedFolder);
+    }
+
+    // Filter by search query
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter(
+        (v) =>
+          v.name.toLowerCase().includes(q) ||
+          v.folder?.toLowerCase().includes(q)
+      );
+    }
+
+    // Exclude short videos option
+    if (settings.library.excludeShortVideos) {
+      const minMs = (settings.library.shortVideoThresholdSec || 10) * 1000;
+      result = result.filter((v) => v.durationMs >= minMs);
+    }
+
+    // Sort order & field
+    const field = settings.library.sortField || 'dateAdded';
+    const order = settings.library.sortOrder || 'desc';
 
     result.sort((a, b) => {
+      let cmp = 0;
       if (field === 'name') {
-        return a.name.localeCompare(b.name) * order;
+        cmp = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      } else if (field === 'duration') {
+        cmp = a.durationMs - b.durationMs;
+      } else if (field === 'size') {
+        cmp = a.sizeBytes - b.sizeBytes;
+      } else {
+        cmp = (a.dateAdded || 0) - (b.dateAdded || 0);
       }
-      if (field === 'duration') {
-        return (a.durationMs - b.durationMs) * order;
-      }
-      if (field === 'size') {
-        return (a.sizeBytes - b.sizeBytes) * order;
-      }
-      // default: dateAdded
-      return ((a.dateAdded || 0) - (b.dateAdded || 0)) * order;
+      return order === 'asc' ? cmp : -cmp;
     });
 
     return result;
@@ -288,47 +319,119 @@ export default function App() {
     return `${filteredVideos.length} videos`;
   }, [activeTab, selectedFolder, folderGroups.length, filteredVideos.length]);
 
-  // Background style based on theme
+  // Background style dynamically reacting to Material You, AMOLED, Dark, or Light
   const getAppBg = () => {
-    if (settings.appearance.themeMode === 'amoled') return '#000000';
-    if (settings.appearance.themeMode === 'light') return '#F8F9FA';
+    if (isAMOLED) return '#000000';
+    if (isLight) return isMaterialYou ? m3Surfaces.background : '#F8F9FA';
+    if (isMaterialYou) return m3Surfaces.background;
     return '#101114';
   };
 
-  const isLight = settings.appearance.themeMode === 'light';
+  // Card / surface style dynamically reacting to Material You, AMOLED, Dark, Light, or Glass
+  const getCardStyle = (isInteractive = true) => {
+    if (isGlass) {
+      return {
+        backgroundColor: accent.glassBg,
+        borderColor: accent.glassBorder,
+        boxShadow: `0 8px 32px 0 rgba(0, 0, 0, 0.36)`,
+      };
+    }
+    if (isMaterialYou) {
+      return {
+        backgroundColor: m3Surfaces.surface,
+        borderColor: m3Surfaces.surfaceBorder,
+      };
+    }
+    if (isAMOLED) {
+      return {
+        backgroundColor: '#09090B',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+      };
+    }
+    if (isLight) {
+      return {
+        backgroundColor: '#FFFFFF',
+        borderColor: 'rgba(0, 0, 0, 0.08)',
+      };
+    }
+    return {
+      backgroundColor: '#1D1E23',
+      borderColor: 'rgba(255, 255, 255, 0.05)',
+    };
+  };
+
+  const getGlassCardClass = (isInteractive = true) => {
+    const depthBlur = isGlass
+      ? settings.appearance.glassIntensity === 'deep'
+        ? 'backdrop-blur-2xl backdrop-saturate-150'
+        : settings.appearance.glassIntensity === 'subtle'
+        ? 'backdrop-blur-md backdrop-saturate-125'
+        : 'backdrop-blur-xl backdrop-saturate-150'
+      : '';
+
+    return `border transition-all duration-200 ${depthBlur} ${
+      isInteractive ? 'hover:scale-[1.008] active:scale-[0.99] cursor-pointer' : ''
+    }`;
+  };
 
   return (
     <div 
-      className="min-h-screen text-[#F5F4FA] flex flex-col font-sans select-none transition-colors duration-200"
-      style={{ backgroundColor: getAppBg(), color: isLight ? '#1A1C1E' : '#F5F4FA' }}
+      className="min-h-screen flex flex-col font-sans select-none transition-colors duration-300 relative overflow-x-hidden"
+      style={{ 
+        backgroundColor: getAppBg(), 
+        color: isLight ? m3Surfaces.textPrimary : '#F5F4FA' 
+      }}
     >
-      <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 pt-5 pb-4 flex-1 flex flex-col">
-        {/* Header Toolbar */}
+      {/* Ambient Android Glass / Material You Backlight Orbs */}
+      {(isGlass || isMaterialYou) && (
+        <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+          <div 
+            className="absolute -top-[12%] -left-[10%] w-[440px] h-[440px] rounded-full blur-[110px] opacity-20 transition-all duration-700"
+            style={{ backgroundColor: accent.primary }}
+          />
+          <div 
+            className="absolute top-[35%] -right-[15%] w-[400px] h-[400px] rounded-full blur-[120px] opacity-15 transition-all duration-700"
+            style={{ backgroundColor: accent.hover }}
+          />
+          <div 
+            className="absolute -bottom-[10%] left-[20%] w-[380px] h-[380px] rounded-full blur-[100px] opacity-15 transition-all duration-700"
+            style={{ backgroundColor: accent.primary }}
+          />
+        </div>
+      )}
+
+      <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 pt-5 pb-6 flex-1 flex flex-col relative z-10">
+        {/* NextPlayer Material 3 Header Toolbar */}
         <header className="flex items-center justify-between py-2">
           {/* Brand title */}
           <div className="flex flex-col">
             <h1 
-              className="text-[27px] font-semibold tracking-[-0.025em] leading-tight"
-              style={{ color: isLight ? '#1A1C1E' : '#F5F4FA' }}
+              className="text-[26px] font-bold tracking-tight leading-tight"
+              style={{ color: isLight ? m3Surfaces.textPrimary : '#F5F4FA' }}
             >
               PixelFlow
             </h1>
-            <span className="text-[10px] tracking-[0.16em] uppercase text-[#A6A6B2] font-medium mt-0.5">
+            <span className="text-[10px] tracking-[0.16em] uppercase text-[#A6A6B2] font-semibold mt-0.5">
               YOUR VIDEO SPACE
             </span>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center space-x-2">
+          {/* Action buttons (NextPlayer M3 circle action row) */}
+          <div className="flex items-center space-x-1.5 sm:space-x-2">
             <button
               type="button"
               onClick={() => setSearchVisible((prev) => !prev)}
               aria-label="Search videos"
               title="Search videos"
-              className="w-[42px] h-[46px] rounded-2xl flex items-center justify-center active:scale-95 transition shadow-xs"
-              style={{ backgroundColor: accent.primary, color: accent.ink }}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center active:scale-95 transition-all shadow-xs"
+              style={{ 
+                backgroundColor: isMaterialYou ? accent.surfaceTint : isGlass ? accent.glassBg : '#26272D', 
+                color: accent.primary,
+                borderColor: isMaterialYou ? m3Surfaces.surfaceBorder : 'rgba(255,255,255,0.08)',
+                borderWidth: 1
+              }}
             >
-              <Search className="w-5 h-5 stroke-[2.5]" />
+              <Search className="w-4 h-4 stroke-[2.4]" />
             </button>
 
             <button
@@ -336,10 +439,15 @@ export default function App() {
               onClick={() => setIsQuickSettingsOpen(true)}
               aria-label="Quick settings"
               title="Quick settings"
-              className="w-[42px] h-[46px] rounded-2xl flex items-center justify-center active:scale-95 transition shadow-xs"
-              style={{ backgroundColor: accent.primary, color: accent.ink }}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center active:scale-95 transition-all shadow-xs"
+              style={{ 
+                backgroundColor: isMaterialYou ? accent.surfaceTint : isGlass ? accent.glassBg : '#26272D', 
+                color: accent.primary,
+                borderColor: isMaterialYou ? m3Surfaces.surfaceBorder : 'rgba(255,255,255,0.08)',
+                borderWidth: 1
+              }}
             >
-              <Grid className="w-5 h-5 stroke-[2.5]" />
+              <Grid className="w-4 h-4 stroke-[2.4]" />
             </button>
 
             <button
@@ -347,10 +455,15 @@ export default function App() {
               onClick={() => setIsSettingsOpen(true)}
               aria-label="Settings"
               title="Settings"
-              className="w-[42px] h-[46px] rounded-2xl flex items-center justify-center active:scale-95 transition shadow-xs"
-              style={{ backgroundColor: accent.primary, color: accent.ink }}
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center active:scale-95 transition-all shadow-xs"
+              style={{ 
+                backgroundColor: isMaterialYou ? accent.surfaceTint : isGlass ? accent.glassBg : '#26272D', 
+                color: accent.primary,
+                borderColor: isMaterialYou ? m3Surfaces.surfaceBorder : 'rgba(255,255,255,0.08)',
+                borderWidth: 1
+              }}
             >
-              <Settings className="w-5 h-5 stroke-[2.5]" />
+              <Settings className="w-4 h-4 stroke-[2.4]" />
             </button>
 
             <button
@@ -358,32 +471,35 @@ export default function App() {
               onClick={() => setIsAddVideoOpen(true)}
               aria-label="Add videos"
               title="Add videos"
-              className="w-[42px] h-[46px] rounded-2xl flex items-center justify-center active:scale-95 transition shadow-xs"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center active:scale-95 transition-all shadow-md"
               style={{ backgroundColor: accent.primary, color: accent.ink }}
             >
-              <Plus className="w-5 h-5 stroke-[2.5]" />
+              <Plus className="w-4 h-4 stroke-[2.6]" />
             </button>
           </div>
         </header>
 
         {/* Search input bar */}
         {searchVisible && (
-          <div className="mt-4 relative animate-in fade-in duration-150">
+          <div className="mt-2.5 relative animate-in fade-in duration-150">
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search videos, folders, and streams"
-              className={`w-full h-[50px] px-4 pr-10 rounded-2xl text-sm placeholder-[#A6A6B2] border border-transparent focus:outline-none transition ${
-                isLight ? 'bg-white shadow-xs border-black/10 text-gray-900' : 'bg-[#1D1E23] text-[#F5F4FA]'
-              }`}
+              placeholder="Search videos, folders, and streams…"
+              className="w-full h-11 px-4 pr-10 rounded-2xl text-xs sm:text-sm placeholder-[#A6A6B2] border focus:outline-none transition shadow-sm"
+              style={{
+                backgroundColor: isMaterialYou ? m3Surfaces.surfaceContainer : isLight ? '#FFFFFF' : '#1D1E23',
+                color: isLight ? m3Surfaces.textPrimary : '#F5F4FA',
+                borderColor: isMaterialYou ? accent.primary : 'rgba(255,255,255,0.1)',
+              }}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-[#A6A6B2] hover:text-[#F5F4FA] transition"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#A6A6B2] hover:text-[#F5F4FA] transition"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -391,59 +507,65 @@ export default function App() {
           </div>
         )}
 
-        {/* Tabs: Videos vs Folders */}
-        <div className="flex items-center space-x-2 py-3.5">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('videos');
-              setSelectedFolder(null);
+        {/* NextPlayer Material 3 Segmented Pill Tabs: Folders vs Videos */}
+        <div className="py-3.5">
+          <div 
+            className="p-1 rounded-2xl flex items-center space-x-1 border"
+            style={{
+              backgroundColor: isMaterialYou ? m3Surfaces.surfaceContainer : isLight ? '#EAE8ED' : '#1D1E23',
+              borderColor: isMaterialYou ? m3Surfaces.surfaceBorder : 'rgba(255,255,255,0.06)',
             }}
-            className={`flex-1 h-10 rounded-[14px] text-sm font-medium transition flex items-center justify-center ${
-              activeTab === 'videos'
-                ? isLight
-                  ? 'bg-black/10 font-bold'
-                  : 'bg-[#26272D] font-bold'
-                : 'text-[#A6A6B2] hover:text-white'
-            }`}
-            style={{ color: activeTab === 'videos' ? accent.primary : undefined }}
           >
-            Videos
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('folders');
+                setSelectedFolder(null);
+              }}
+              className="flex-1 h-10 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center space-x-2"
+              style={{
+                backgroundColor: activeTab === 'folders' ? accent.primary : 'transparent',
+                color: activeTab === 'folders' ? accent.ink : isLight ? m3Surfaces.textSecondary : '#A6A6B2',
+                boxShadow: activeTab === 'folders' ? `0 2px 8px ${accent.glow}` : undefined,
+              }}
+            >
+              <FolderIcon className="w-4 h-4 stroke-[2.2]" />
+              <span>Folders</span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab('folders');
-              setSelectedFolder(null);
-            }}
-            className={`flex-1 h-10 rounded-[14px] text-sm font-medium transition flex items-center justify-center ${
-              activeTab === 'folders'
-                ? isLight
-                  ? 'bg-black/10 font-bold'
-                  : 'bg-[#26272D] font-bold'
-                : 'text-[#A6A6B2] hover:text-white'
-            }`}
-            style={{ color: activeTab === 'folders' ? accent.primary : undefined }}
-          >
-            Folders
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('videos');
+                setSelectedFolder(null);
+              }}
+              className="flex-1 h-10 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center space-x-2"
+              style={{
+                backgroundColor: activeTab === 'videos' ? accent.primary : 'transparent',
+                color: activeTab === 'videos' ? accent.ink : isLight ? m3Surfaces.textSecondary : '#A6A6B2',
+                boxShadow: activeTab === 'videos' ? `0 2px 8px ${accent.glow}` : undefined,
+              }}
+            >
+              <Film className="w-4 h-4 stroke-[2.2]" />
+              <span>Videos</span>
+            </button>
+          </div>
         </div>
 
         {/* Folder navigation breadcrumb */}
         {selectedFolder && (
-          <div className="pb-2">
+          <div className="pb-2.5">
             <button
               type="button"
               onClick={() => {
                 setSelectedFolder(null);
                 setActiveTab('folders');
               }}
-              className="text-xs font-medium flex items-center space-x-1 transition group"
+              className="text-xs font-semibold flex items-center space-x-1.5 transition group px-2 py-1 rounded-lg"
               style={{ color: accent.primary }}
             >
-              <span className="text-sm">‹</span>
-              <span className="group-hover:underline">All folders</span>
+              <span className="text-base font-bold">‹</span>
+              <span className="group-hover:underline">Back to all folders</span>
             </button>
           </div>
         )}
@@ -466,12 +588,12 @@ export default function App() {
           </div>
         )}
 
-        {/* Continue Watching Shelf */}
+        {/* Continue Watching Shelf (NextPlayer signature shelf) */}
         {watchHistory.length > 0 && !selectedFolder && (
           <div className="mb-4 pt-1 pb-2">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-2 px-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-[#A6A6B2] flex items-center space-x-1.5">
-                <Clock className="w-3.5 h-3.5" />
+                <Clock className="w-3.5 h-3.5" style={{ color: accent.primary }} />
                 <span>Continue Watching</span>
               </span>
               <button
@@ -482,7 +604,7 @@ export default function App() {
               </button>
             </div>
             <div className="flex space-x-3 overflow-x-auto pb-1.5 pt-0.5 no-scrollbar">
-              {watchHistory.slice(0, 5).map((item) => {
+              {watchHistory.slice(0, 6).map((item) => {
                 const targetVid = videos.find((v) => v.id === item.videoId);
                 if (!targetVid) return null;
                 const progressPct = Math.min(100, (item.positionSeconds / (item.durationSeconds || 1)) * 100);
@@ -491,14 +613,15 @@ export default function App() {
                   <div
                     key={item.videoId}
                     onClick={() => handleStartPlayback(targetVid, item.positionSeconds)}
-                    className="shrink-0 w-36 sm:w-40 rounded-2xl bg-[#1D1E23] p-2 cursor-pointer hover:bg-[#25262C] transition group"
+                    className={`shrink-0 w-36 sm:w-40 rounded-2xl p-2.5 ${getGlassCardClass()}`}
+                    style={getCardStyle()}
                   >
-                    <div className="w-full aspect-video rounded-xl bg-[#26272D] overflow-hidden relative">
+                    <div className="w-full aspect-video rounded-xl bg-[#26272D] overflow-hidden relative shadow-xs">
                       {targetVid.thumbnailUrl ? (
                         <img src={targetVid.thumbnailUrl} alt={item.videoName} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Play className="w-5 h-5 text-[#C4B5FD] opacity-75" />
+                          <Play className="w-5 h-5 opacity-80" style={{ color: accent.primary }} />
                         </div>
                       )}
                       {/* Red Progress bar underneath */}
@@ -509,11 +632,14 @@ export default function App() {
                         />
                       </div>
                     </div>
-                    <h5 className="text-[11px] font-medium text-[#F5F4FA] truncate mt-1.5 group-hover:text-[#C4B5FD]">
+                    <h5 
+                      className="text-[11px] font-medium truncate mt-2"
+                      style={{ color: isLight ? m3Surfaces.textPrimary : '#F5F4FA' }}
+                    >
                       {item.videoName}
                     </h5>
-                    <p className="text-[9px] text-[#A6A6B2]">
-                      Resume at {formatDuration(item.positionSeconds * 1000)}
+                    <p className="text-[9px] text-[#A6A6B2] mt-0.5">
+                      Resume · {formatDuration(item.positionSeconds * 1000)}
                     </p>
                   </div>
                 );
@@ -523,10 +649,13 @@ export default function App() {
         )}
 
         {/* Library section header & Quick Sort indicator */}
-        <div className="flex items-center justify-between py-2">
+        <div className="flex items-center justify-between py-2 px-1">
           <div className="flex items-center space-x-2">
-            <h2 className="text-[19px] font-medium" style={{ color: isLight ? '#1A1C1E' : '#F5F4FA' }}>
-              {selectedFolder ? selectedFolder : 'Your library'}
+            <h2 
+              className="text-[18px] sm:text-[20px] font-bold tracking-tight" 
+              style={{ color: isLight ? m3Surfaces.textPrimary : '#F5F4FA' }}
+            >
+              {selectedFolder ? selectedFolder : activeTab === 'folders' ? 'Media Folders' : 'All Videos'}
             </h2>
           </div>
 
@@ -541,23 +670,28 @@ export default function App() {
                   },
                 }))
               }
-              className="flex items-center space-x-1 hover:text-[#F5F4FA] transition p-1 rounded-md"
+              className="flex items-center space-x-1.5 hover:text-[#F5F4FA] transition px-2 py-1 rounded-lg"
               title={`Sorting by ${settings.library.sortField} (${settings.library.sortOrder})`}
             >
-              <ArrowUpDown className="w-3.5 h-3.5" />
-              <span className="capitalize">{settings.library.sortField}</span>
+              <ArrowUpDown className="w-3.5 h-3.5" style={{ color: accent.primary }} />
+              <span className="capitalize font-medium">{settings.library.sortField}</span>
             </button>
             <span>·</span>
-            <span>{libraryCountLabel}</span>
+            <span className="font-medium">{libraryCountLabel}</span>
           </div>
         </div>
 
         {/* Main media content area */}
         <div className="flex-1 overflow-y-auto py-1">
           {videos.length === 0 ? (
-            <div className="py-12 px-4 text-center rounded-2xl bg-[#1D1E23]/40 border border-[#26272D] my-4">
-              <FolderIcon className="w-12 h-12 text-[#C4B5FD] mx-auto mb-3 opacity-80" />
-              <p className="text-sm font-medium text-[#F5F4FA]">No videos found yet</p>
+            <div 
+              className="py-12 px-4 text-center rounded-3xl border my-4"
+              style={getCardStyle(false)}
+            >
+              <FolderIcon className="w-12 h-12 mx-auto mb-3 opacity-80" style={{ color: accent.primary }} />
+              <p className="text-sm font-semibold" style={{ color: isLight ? m3Surfaces.textPrimary : '#F5F4FA' }}>
+                No videos found yet
+              </p>
               <p className="text-xs text-[#A6A6B2] mt-1 max-w-sm mx-auto">
                 Add a video to your device or tap + to open one from files or web streams.
               </p>
@@ -572,7 +706,7 @@ export default function App() {
               </button>
             </div>
           ) : activeTab === 'folders' && selectedFolder === null ? (
-            /* Folders view */
+            /* Folders view (NextPlayer Android signature squircle cards) */
             <div className="space-y-2.5">
               {folderGroups.length === 0 ? (
                 <p className="text-xs text-[#A6A6B2] py-6 text-center">
@@ -586,35 +720,41 @@ export default function App() {
                       setSelectedFolder(folder);
                       setActiveTab('videos');
                     }}
-                    className={`w-full p-3.5 sm:p-4 rounded-[17px] flex items-center cursor-pointer transition active:scale-[0.99] border border-transparent hover:border-[#26272D] ${
-                      isLight ? 'bg-white shadow-xs' : 'bg-[#1D1E23] hover:bg-[#25262C]'
-                    }`}
+                    className={`w-full p-3.5 rounded-[22px] flex items-center ${getGlassCardClass()}`}
+                    style={getCardStyle()}
                   >
+                    {/* Squircle folder icon tile */}
                     <div 
-                      className="w-[52px] h-[52px] rounded-[13px] bg-[#26272D] flex items-center justify-center text-xl font-bold shrink-0"
-                      style={{ color: accent.primary }}
+                      className="w-[52px] h-[52px] rounded-[16px] flex items-center justify-center shrink-0 shadow-xs"
+                      style={{ 
+                        backgroundColor: isMaterialYou ? accent.surfaceTint : `${accent.primary}25`,
+                        color: accent.primary 
+                      }}
                     >
-                      ▰
+                      <FolderIcon className="w-6 h-6 stroke-[2.2]" />
                     </div>
 
-                    <div className="flex-1 min-w-0 pl-3.5 pr-2">
-                      <h3 className="text-[15px] font-medium truncate" style={{ color: isLight ? '#1A1C1E' : '#F5F4FA' }}>
+                    <div className="flex-1 min-w-0 pl-4 pr-2">
+                      <h3 
+                        className="text-[15px] font-semibold truncate leading-snug" 
+                        style={{ color: isLight ? m3Surfaces.textPrimary : '#F5F4FA' }}
+                      >
                         {folder}
                       </h3>
-                      <p className="text-xs text-[#A6A6B2] mt-1">
-                        {entries.length} {entries.length === 1 ? 'video' : 'videos'}
+                      <p className="text-xs text-[#A6A6B2] mt-1 flex items-center space-x-1.5">
+                        <span>{entries.length} {entries.length === 1 ? 'video' : 'videos'}</span>
+                        <span>·</span>
+                        <span>{formatSize(entries.reduce((acc, v) => acc + (v.sizeBytes || 0), 0))}</span>
                       </p>
                     </div>
 
-                    <span className="text-[#A6A6B2] text-2xl font-light shrink-0">
-                      ›
-                    </span>
+                    <ChevronRight className="w-5 h-5 text-[#A6A6B2] shrink-0" />
                   </div>
                 ))
               )}
             </div>
           ) : (
-            /* Videos view (in List or Grid mode) */
+            /* Videos view (in List or Grid mode matching NextPlayer screenshots) */
             <>
               {filteredVideos.length === 0 ? (
                 <p className="text-xs text-[#A6A6B2] py-6 text-center">
@@ -632,13 +772,15 @@ export default function App() {
                       <div
                         key={video.id}
                         onClick={() => handleStartPlayback(video)}
-                        className={`group relative rounded-[17px] overflow-hidden p-2.5 cursor-pointer transition active:scale-[0.98] border ${
-                          isLight ? 'bg-white shadow-xs' : 'bg-[#1D1E23] hover:bg-[#25262C]'
-                        } ${
-                          isCurrent ? 'border-[#C4B5FD]' : 'border-transparent'
+                        className={`group relative rounded-[20px] overflow-hidden p-2.5 ${getGlassCardClass()} ${
+                          isCurrent ? 'ring-2' : ''
                         }`}
+                        style={{
+                          ...getCardStyle(),
+                          outlineColor: isCurrent ? accent.primary : undefined,
+                        }}
                       >
-                        <div className="w-full aspect-video rounded-xl bg-[#26272D] overflow-hidden relative flex items-center justify-center">
+                        <div className="w-full aspect-video rounded-xl bg-[#26272D] overflow-hidden relative flex items-center justify-center shadow-xs">
                           {video.thumbnailUrl ? (
                             <img
                               src={video.thumbnailUrl}
@@ -652,7 +794,7 @@ export default function App() {
                           )}
 
                           {settings.library.showDurationBadge && (
-                            <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/75 text-[10px] font-mono text-[#F5F4FA]">
+                            <span className="absolute bottom-1.5 right-1.5 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono font-medium text-[#F5F4FA]">
                               {formatDuration(video.durationMs)}
                             </span>
                           )}
@@ -665,10 +807,10 @@ export default function App() {
                           )}
                         </div>
 
-                        <div className="mt-2">
+                        <div className="mt-2.5 px-0.5">
                           <h4 
-                            className="text-xs font-medium line-clamp-2 leading-snug transition"
-                            style={{ color: isLight ? '#1A1C1E' : '#F5F4FA' }}
+                            className="text-xs font-semibold line-clamp-2 leading-snug transition"
+                            style={{ color: isLight ? m3Surfaces.textPrimary : '#F5F4FA' }}
                           >
                             {video.name}
                           </h4>
@@ -692,13 +834,16 @@ export default function App() {
                       <div
                         key={video.id}
                         onClick={() => handleStartPlayback(video)}
-                        className={`w-full p-2.5 sm:p-3 rounded-[17px] flex items-center cursor-pointer transition active:scale-[0.99] border ${
-                          isLight ? 'bg-white shadow-xs' : 'bg-[#1D1E23] hover:bg-[#25262C]'
-                        } ${
-                          isCurrent ? 'border-[#C4B5FD]' : 'border-transparent'
+                        className={`w-full p-2.5 sm:p-3 rounded-[20px] flex items-center ${getGlassCardClass()} ${
+                          isCurrent ? 'ring-2' : ''
                         }`}
+                        style={{
+                          ...getCardStyle(),
+                          outlineColor: isCurrent ? accent.primary : undefined,
+                        }}
                       >
-                        <div className="w-[104px] h-[72px] rounded-xl bg-[#26272D] overflow-hidden relative shrink-0 flex items-center justify-center shadow-xs">
+                        {/* 16:9 Thumbnail container */}
+                        <div className="w-[104px] sm:w-[114px] h-[72px] sm:h-[76px] rounded-xl bg-[#26272D] overflow-hidden relative shrink-0 flex items-center justify-center shadow-xs">
                           {video.thumbnailUrl ? (
                             <img
                               src={video.thumbnailUrl}
@@ -712,7 +857,7 @@ export default function App() {
                           )}
 
                           {settings.library.showDurationBadge && (
-                            <span className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-black/80 text-[9px] font-mono text-[#F5F4FA]">
+                            <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/80 text-[9px] font-mono font-medium text-[#F5F4FA]">
                               {formatDuration(video.durationMs)}
                             </span>
                           )}
@@ -724,12 +869,18 @@ export default function App() {
                           )}
                         </div>
 
-                        <div className="flex-1 min-w-0 pl-3 pr-1">
-                          <h4 className="text-sm font-medium line-clamp-2 leading-snug" style={{ color: isLight ? '#1A1C1E' : '#F5F4FA' }}>
+                        {/* Title and metadata */}
+                        <div className="flex-1 min-w-0 pl-3.5 pr-2">
+                          <h4 
+                            className="text-sm font-semibold line-clamp-2 leading-snug" 
+                            style={{ color: isLight ? m3Surfaces.textPrimary : '#F5F4FA' }}
+                          >
                             {video.name}
                           </h4>
-                          <p className="text-[11px] text-[#A6A6B2] mt-1">
-                            {formatDuration(video.durationMs)} · {formatSize(video.sizeBytes)}
+                          <p className="text-[11px] text-[#A6A6B2] mt-1 flex items-center space-x-1.5">
+                            <span>{formatDuration(video.durationMs)}</span>
+                            <span>·</span>
+                            <span>{formatSize(video.sizeBytes)}</span>
                           </p>
                           <p className="text-[10px] text-[#A6A6B2] mt-0.5 truncate">
                             {video.folder}
@@ -754,10 +905,11 @@ export default function App() {
         </div>
 
         {/* Footer status message */}
-        <footer className="py-2.5 text-center shrink-0">
-          <p className="text-[11px] text-[#A6A6B2]">
-            {statusMessage}
-          </p>
+        <footer className="pt-3 pb-1 border-t border-white/5 text-[11px] text-[#A6A6B2] flex items-center justify-between">
+          <span className="truncate">{statusMessage}</span>
+          <span className="shrink-0 ml-2 font-mono text-[10px] uppercase">
+            {settings.appearance.themeMode}
+          </span>
         </footer>
       </div>
 
@@ -807,6 +959,29 @@ export default function App() {
             player: { ...prev.player, loopMode: loop },
           }))
         }
+        enableGlassUI={settings.appearance.enableGlassUI}
+        onGlassUIToggle={(enable) =>
+          setSettings((prev) => ({
+            ...prev,
+            appearance: { ...prev.appearance, enableGlassUI: enable },
+          }))
+        }
+        showFileExtension={settings.appearance.showFileExtension}
+        onShowFileExtensionToggle={(show) =>
+          setSettings((prev) => ({
+            ...prev,
+            appearance: { ...prev.appearance, showFileExtension: show },
+          }))
+        }
+        showDurationBadge={settings.library.showDurationBadge}
+        onShowDurationBadgeToggle={(show) =>
+          setSettings((prev) => ({
+            ...prev,
+            library: { ...prev.library, showDurationBadge: show },
+          }))
+        }
+        accentColor={accent.primary}
+        accentInk={accent.ink}
       />
 
       <SettingsModal
@@ -824,6 +999,8 @@ export default function App() {
         onClose={() => setIsAddVideoOpen(false)}
         onAddVideos={handleAddVideos}
         folders={allFolderNames}
+        accentColor={accent.primary}
+        accentInk={accent.ink}
       />
     </div>
   );

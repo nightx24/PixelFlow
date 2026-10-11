@@ -19,7 +19,7 @@ import {
   Repeat
 } from 'lucide-react';
 import { VideoEntry, PixelFlowSettings, SubtitleTrack, SubtitleCue } from '../types.ts';
-import { formatDuration, parseSRT, ACCENT_COLORS } from '../utils.ts';
+import { formatDuration, parseSRT, ACCENT_COLORS, getAccentPalette } from '../utils.ts';
 
 interface PlayerViewProps {
   video: VideoEntry | null;
@@ -91,7 +91,9 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
   const sourceNodeRef = useRef<MediaElementAudioSourceNode | null>(null);
 
-  const accent = ACCENT_COLORS[settings.appearance.accentColor] || ACCENT_COLORS.lavender;
+  const accent = useMemo(() => {
+    return getAccentPalette(settings.appearance.accentColor, settings.appearance.customAccentHex);
+  }, [settings.appearance.accentColor, settings.appearance.customAccentHex]);
 
   const triggerHud = useCallback((type: 'brightness' | 'volume' | 'seek' | 'fastforward' | 'doubletap', value: string | number, side: 'left' | 'right' | 'center' = 'center') => {
     setHudType(type);
@@ -573,27 +575,30 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           <div className="flex flex-col items-center justify-center p-4 rounded-3xl bg-black/85 border border-white/10 backdrop-blur-md shadow-2xl min-w-[90px] text-white">
             {hudType === 'brightness' && (
               <>
-                <Sun className="w-8 h-8 text-[#C4B5FD] mb-2 animate-spin-slow" />
+                <Sun className="w-8 h-8 mb-2 animate-spin-slow" style={{ color: accent.primary }} />
                 <span className="text-xs font-semibold text-[#A6A6B2] uppercase">Brightness</span>
                 <span className="text-lg font-bold font-mono mt-0.5">{hudValue}</span>
               </>
             )}
             {hudType === 'volume' && (
               <>
-                <Volume2 className="w-8 h-8 text-[#C4B5FD] mb-2" />
+                <Volume2 className="w-8 h-8 mb-2" style={{ color: accent.primary }} />
                 <span className="text-xs font-semibold text-[#A6A6B2] uppercase">Volume</span>
                 <span className="text-lg font-bold font-mono mt-0.5">{hudValue}</span>
               </>
             )}
             {hudType === 'seek' && (
               <>
-                <FastForward className="w-8 h-8 text-[#C4B5FD] mb-2" />
+                <FastForward className="w-8 h-8 mb-2" style={{ color: accent.primary }} />
                 <span className="text-sm font-semibold font-mono text-center">{hudValue}</span>
               </>
             )}
             {hudType === 'doubletap' && (
               <>
-                <div className="w-12 h-12 rounded-full border-2 border-[#C4B5FD] flex items-center justify-center text-sm font-bold font-mono text-[#C4B5FD] mb-1 animate-ping">
+                <div 
+                  className="w-12 h-12 rounded-full border-2 flex items-center justify-center text-sm font-bold font-mono mb-1 animate-ping"
+                  style={{ borderColor: accent.primary, color: accent.primary }}
+                >
                   {hudValue}
                 </div>
               </>
@@ -624,7 +629,10 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
         }`}
       >
         <div className="flex items-center space-x-2 truncate pr-4">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#C4B5FD] animate-pulse shrink-0" />
+          <span 
+            className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0" 
+            style={{ backgroundColor: accent.primary }}
+          />
           <h3 className="text-sm sm:text-base font-medium text-[#F5F4FA] truncate">
             {video.name}
           </h3>
@@ -637,9 +645,13 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
               onClick={() => setShowSubtitleMenu(!showSubtitleMenu)}
               className={`p-1.5 sm:p-2 rounded-xl transition text-xs flex items-center space-x-1 ${
                 activeSubtitleTrack
-                  ? 'bg-[#C4B5FD] text-[#241948] font-semibold'
+                  ? 'font-semibold'
                   : 'bg-white/10 hover:bg-white/20 text-[#F5F4FA]'
               }`}
+              style={{
+                backgroundColor: activeSubtitleTrack ? accent.primary : undefined,
+                color: activeSubtitleTrack ? accent.ink : undefined,
+              }}
               title="Subtitles"
             >
               <SubtitlesIcon className="w-4 h-4" />
@@ -659,8 +671,11 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                     setShowSubtitleMenu(false);
                   }}
                   className={`w-full px-3 py-1.5 text-left text-xs transition ${
-                    activeSubtitleTrack === null ? 'text-[#C4B5FD] font-semibold' : 'text-[#F5F4FA] hover:bg-[#26272D]'
+                    activeSubtitleTrack === null ? 'font-semibold' : 'text-[#F5F4FA] hover:bg-[#26272D]'
                   }`}
+                  style={{
+                    color: activeSubtitleTrack === null ? accent.primary : undefined,
+                  }}
                 >
                   Off
                 </button>
@@ -672,8 +687,11 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                       setShowSubtitleMenu(false);
                     }}
                     className={`w-full px-3 py-1.5 text-left text-xs transition ${
-                      activeSubtitleTrack === s.id ? 'text-[#C4B5FD] font-semibold' : 'text-[#F5F4FA] hover:bg-[#26272D]'
+                      activeSubtitleTrack === s.id ? 'font-semibold' : 'text-[#F5F4FA] hover:bg-[#26272D]'
                     }`}
+                    style={{
+                      color: activeSubtitleTrack === s.id ? accent.primary : undefined,
+                    }}
                   >
                     {s.label}
                   </button>
@@ -685,15 +703,21 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                       setShowSubtitleMenu(false);
                     }}
                     className={`w-full px-3 py-1.5 text-left text-xs transition ${
-                      activeSubtitleTrack === 'custom' ? 'text-[#C4B5FD] font-semibold' : 'text-[#F5F4FA] hover:bg-[#26272D]'
+                      activeSubtitleTrack === 'custom' ? 'font-semibold' : 'text-[#F5F4FA] hover:bg-[#26272D]'
                     }`}
+                    style={{
+                      color: activeSubtitleTrack === 'custom' ? accent.primary : undefined,
+                    }}
                   >
                     Custom Uploaded SRT ({customSubtitleCues.length} cues)
                   </button>
                 )}
 
                 <div className="border-t border-[#26272D] my-1 pt-1 px-3">
-                  <label className="block text-xs text-[#C4B5FD] hover:underline cursor-pointer py-1">
+                  <label 
+                    className="block text-xs hover:underline cursor-pointer py-1"
+                    style={{ color: accent.primary }}
+                  >
                     Upload .SRT File…
                     <input
                       type="file"
@@ -731,8 +755,11 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
                       triggerHud('seek', `Scale: ${mode.toUpperCase()}`, 'center');
                     }}
                     className={`w-full px-3 py-1.5 text-left text-xs uppercase font-medium transition ${
-                      fitMode === mode ? 'text-[#C4B5FD] font-bold' : 'text-[#F5F4FA] hover:bg-[#26272D]'
+                      fitMode === mode ? 'font-bold' : 'text-[#F5F4FA] hover:bg-[#26272D]'
                     }`}
+                    style={{
+                      color: fitMode === mode ? accent.primary : undefined,
+                    }}
                   >
                     {mode}
                   </button>

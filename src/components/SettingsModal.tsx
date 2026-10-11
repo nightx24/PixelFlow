@@ -13,11 +13,12 @@ import {
   ArrowLeft,
   RefreshCw,
   Trash2,
-  ExternalLink,
-  Check
+  Check,
+  Pipette
 } from 'lucide-react';
 import { PixelFlowSettings, ThemeMode, AccentColor, SortField, SortOrder } from '../types.ts';
-import { ACCENT_COLORS } from '../utils.ts';
+import { ACCENT_COLORS, getAccentPalette, generateAccentPalette } from '../utils.ts';
+import { ToggleSwitch } from './ToggleSwitch.tsx';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -29,6 +30,29 @@ interface SettingsModalProps {
   totalVideosCount: number;
 }
 
+const PRESET_ACCENTS: AccentColor[] = [
+  'lavender',
+  'violet',
+  'emerald',
+  'blue',
+  'amber',
+  'rose',
+  'coral',
+  'cyan',
+  'lime',
+];
+
+const QUICK_CUSTOM_PALETTES = [
+  { name: 'Neon Aqua', hex: '#00F2FE' },
+  { name: 'Cyber Violet', hex: '#8B5CF6' },
+  { name: 'Electric Pink', hex: '#EC4899' },
+  { name: 'Tangerine', hex: '#F97316' },
+  { name: 'Vivid Mint', hex: '#10B981' },
+  { name: 'Crimson Glow', hex: '#F43F5E' },
+  { name: 'Deep Sky', hex: '#0284C7' },
+  { name: 'Sunny Gold', hex: '#F59E0B' },
+];
+
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
   onClose,
@@ -39,116 +63,405 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   totalVideosCount,
 }) => {
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [customHexInput, setCustomHexInput] = useState<string>(
+    settings.appearance.customAccentHex || '#C4B5FD'
+  );
 
   if (!isOpen) return null;
 
-  const currentAccent = ACCENT_COLORS[settings.appearance.accentColor] || ACCENT_COLORS.lavender;
+  const currentAccent = getAccentPalette(
+    settings.appearance.accentColor,
+    settings.appearance.customAccentHex
+  );
+
+  const handleApplyCustomColor = (hex: string) => {
+    let cleanHex = hex.trim();
+    if (!cleanHex.startsWith('#')) cleanHex = `#${cleanHex}`;
+    setCustomHexInput(cleanHex);
+    if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(cleanHex)) {
+      onUpdateSettings((prev) => ({
+        ...prev,
+        appearance: {
+          ...prev.appearance,
+          accentColor: 'custom',
+          customAccentHex: cleanHex,
+        },
+      }));
+    }
+  };
 
   const sections = [
     {
       id: 'appearance',
       title: 'Appearance',
-      subtitle: 'Theme, accent palette, display density',
+      subtitle: 'Theme, custom accent palette, display density',
       icon: Palette,
       render: () => (
         <div className="space-y-5">
           {/* Theme Mode */}
           <div>
             <label className="block text-xs uppercase tracking-wider text-[#A6A6B2] mb-2 font-medium">
-              Theme Mode
+              Theme Mode & Style
             </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(['dark', 'amoled', 'light'] as ThemeMode[]).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() =>
-                    onUpdateSettings((prev) => ({
-                      ...prev,
-                      appearance: { ...prev.appearance, themeMode: mode },
-                    }))
-                  }
-                  className={`py-2 px-3 rounded-2xl text-xs font-medium capitalize transition ${
-                    settings.appearance.themeMode === mode
-                      ? 'bg-[#C4B5FD] text-[#241948] font-bold shadow-xs'
-                      : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
-                  }`}
-                >
-                  {mode === 'amoled' ? 'Pure AMOLED' : mode}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Accent Color */}
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-[#A6A6B2] mb-2 font-medium">
-              Accent Color
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {(Object.keys(ACCENT_COLORS) as AccentColor[]).map((colorKey) => {
-                const color = ACCENT_COLORS[colorKey];
-                const isSelected = settings.appearance.accentColor === colorKey;
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { id: 'material-you', label: 'Material You (M3)' },
+                { id: 'dark', label: 'Dark Slate' },
+                { id: 'amoled', label: 'Pure AMOLED' },
+                { id: 'light', label: 'M3 Light' },
+              ].map((m) => {
+                const isSelected = settings.appearance.themeMode === m.id;
                 return (
                   <button
-                    key={colorKey}
+                    key={m.id}
                     onClick={() =>
                       onUpdateSettings((prev) => ({
                         ...prev,
-                        appearance: { ...prev.appearance, accentColor: colorKey },
+                        appearance: { ...prev.appearance, themeMode: m.id as ThemeMode },
                       }))
                     }
-                    className={`py-2.5 px-3 rounded-2xl text-xs font-medium capitalize flex items-center space-x-2 transition ${
+                    className={`py-2 px-2.5 rounded-2xl text-xs font-medium text-center transition ${
                       isSelected
-                        ? 'bg-[#26272D] border-2 border-white/60 text-[#F5F4FA]'
-                        : 'bg-[#26272D] hover:bg-[#32333B] text-[#A6A6B2]'
+                        ? 'font-bold shadow-xs'
+                        : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
                     }`}
+                    style={{
+                      backgroundColor: isSelected ? currentAccent.primary : undefined,
+                      color: isSelected ? currentAccent.ink : undefined,
+                    }}
                   >
-                    <span
-                      className="w-4 h-4 rounded-full shrink-0 shadow-xs"
-                      style={{ backgroundColor: color.primary }}
-                    />
-                    <span>{colorKey}</span>
+                    {m.label}
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Toggles */}
+          {/* Android Glass UI Toggle & Options */}
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                appearance: { ...prev.appearance, enableGlassUI: !prev.appearance.enableGlassUI },
+              }))
+            }
+            className="p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2B2C33] border border-white/5 space-y-3 cursor-pointer transition"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm font-semibold text-[#F5F4FA] flex items-center space-x-1.5">
+                  <span 
+                    className="w-2 h-2 rounded-full animate-pulse" 
+                    style={{ backgroundColor: currentAccent.primary }}
+                  />
+                  <span>Android Glass UI</span>
+                </span>
+                <span className="text-xs text-[#A6A6B2] block mt-0.5">
+                  Pixel-style ambient frosted blur with dynamic theme glow (not Apple glass)
+                </span>
+              </div>
+              <ToggleSwitch
+                checked={settings.appearance.enableGlassUI}
+                onChange={(checked) =>
+                  onUpdateSettings((prev) => ({
+                    ...prev,
+                    appearance: { ...prev.appearance, enableGlassUI: checked },
+                  }))
+                }
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Android Glass UI"
+              />
+            </div>
+
+            {settings.appearance.enableGlassUI && (
+              <div 
+                className="pt-2 border-t border-white/5 space-y-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <label className="block text-[11px] uppercase tracking-wider text-[#A6A6B2] font-medium">
+                  Glass Diffusion Depth
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['subtle', 'medium', 'deep'] as const).map((depth) => {
+                    const isSelected = settings.appearance.glassIntensity === depth;
+                    return (
+                      <button
+                        key={depth}
+                        onClick={() =>
+                          onUpdateSettings((prev) => ({
+                            ...prev,
+                            appearance: { ...prev.appearance, glassIntensity: depth },
+                          }))
+                        }
+                        className={`py-1.5 px-2 rounded-xl text-xs font-medium capitalize transition ${
+                          isSelected ? 'font-bold' : 'bg-[#1D1E23] text-[#A6A6B2] hover:text-white'
+                        }`}
+                        style={{
+                          backgroundColor: isSelected ? currentAccent.primary : undefined,
+                          color: isSelected ? currentAccent.ink : undefined,
+                        }}
+                      >
+                        {depth}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Accent Color Customization */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs uppercase tracking-wider text-[#A6A6B2] font-medium">
+                Accent Color Palette
+              </label>
+              <div className="flex items-center space-x-1.5">
+                <span 
+                  className="w-3 h-3 rounded-full shadow-xs" 
+                  style={{ backgroundColor: currentAccent.primary }}
+                />
+                <span className="text-[11px] text-[#A6A6B2] capitalize font-mono">
+                  {settings.appearance.accentColor === 'custom' 
+                    ? settings.appearance.customAccentHex || currentAccent.primary 
+                    : settings.appearance.accentColor}
+                </span>
+              </div>
+            </div>
+
+            {/* Presets Grid with Round Rectangles & Precision Alignment */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {PRESET_ACCENTS.map((colorKey) => {
+                const color = ACCENT_COLORS[colorKey];
+                const isSelected = settings.appearance.accentColor === colorKey;
+                return (
+                  <button
+                    key={colorKey}
+                    type="button"
+                    onClick={() =>
+                      onUpdateSettings((prev) => ({
+                        ...prev,
+                        appearance: { ...prev.appearance, accentColor: colorKey },
+                      }))
+                    }
+                    className={`h-11 px-3 rounded-2xl text-xs font-medium capitalize flex items-center justify-between transition-all cursor-pointer border ${
+                      isSelected
+                        ? 'text-[#F5F4FA] shadow-md shadow-black/30'
+                        : 'border-white/5 bg-[#26272D] hover:bg-[#32333B] text-[#A6A6B2]'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.08)' : undefined,
+                      borderColor: isSelected ? color.primary : undefined,
+                      boxShadow: isSelected ? `0 0 10px ${color.glow}` : undefined,
+                    }}
+                  >
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <span
+                        className="w-4 h-4 rounded-full shrink-0 shadow-xs flex items-center justify-center transition-transform"
+                        style={{ backgroundColor: color.primary }}
+                      >
+                        {isSelected && (
+                          <Check className="w-2.5 h-2.5 stroke-[3.5]" style={{ color: color.ink }} />
+                        )}
+                      </span>
+                      <span className="truncate">{colorKey}</span>
+                    </div>
+                    {isSelected && (
+                      <span 
+                        className="w-1.5 h-1.5 rounded-full shrink-0 ml-1"
+                        style={{ backgroundColor: color.primary }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+
+              {/* Custom Color Selector Round Rectangle Card */}
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateSettings((prev) => ({
+                    ...prev,
+                    appearance: { 
+                      ...prev.appearance, 
+                      accentColor: 'custom',
+                      customAccentHex: customHexInput || currentAccent.primary
+                    },
+                  }))
+                }
+                className={`h-11 px-3 rounded-2xl text-xs font-medium capitalize flex items-center justify-between transition-all cursor-pointer border ${
+                  settings.appearance.accentColor === 'custom'
+                    ? 'text-[#F5F4FA] shadow-md shadow-black/30'
+                    : 'border-white/5 bg-[#26272D] hover:bg-[#32333B] text-[#A6A6B2]'
+                }`}
+                style={{
+                  backgroundColor: settings.appearance.accentColor === 'custom' ? 'rgba(255, 255, 255, 0.08)' : undefined,
+                  borderColor: settings.appearance.accentColor === 'custom' ? currentAccent.primary : undefined,
+                  boxShadow: settings.appearance.accentColor === 'custom' ? `0 0 10px ${currentAccent.glow}` : undefined,
+                }}
+              >
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <span
+                    className="w-4 h-4 rounded-full shrink-0 shadow-xs flex items-center justify-center transition-transform bg-gradient-to-tr from-pink-500 via-amber-400 to-cyan-400"
+                    style={{
+                      backgroundColor: settings.appearance.accentColor === 'custom' ? currentAccent.primary : undefined,
+                    }}
+                  >
+                    {settings.appearance.accentColor === 'custom' && (
+                      <Check className="w-2.5 h-2.5 stroke-[3.5]" style={{ color: currentAccent.ink }} />
+                    )}
+                  </span>
+                  <span className="truncate font-semibold">Custom</span>
+                </div>
+                <Pipette className="w-3.5 h-3.5 text-[#A6A6B2] shrink-0 ml-1" />
+              </button>
+            </div>
+
+            {/* Custom Accent Color Palette Editor */}
+            <div className="mt-3 p-3.5 rounded-2xl bg-[#26272D] border border-white/5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-[#F5F4FA] block">
+                    Custom Color Picker & Hex Code
+                  </span>
+                  <span className="text-[11px] text-[#A6A6B2]">
+                    Pick any custom shade or enter a hex code to theme PixelFlow
+                  </span>
+                </div>
+                <div className="relative flex items-center">
+                  <label 
+                    className="w-8 h-8 rounded-xl cursor-pointer flex items-center justify-center shadow-md transition hover:scale-105 border border-white/10"
+                    style={{ backgroundColor: currentAccent.primary }}
+                    title="Click to open color picker"
+                  >
+                    <Pipette className="w-4 h-4 stroke-[2.5]" style={{ color: currentAccent.ink }} />
+                    <input
+                      type="color"
+                      value={currentAccent.primary}
+                      onChange={(e) => handleApplyCustomColor(e.target.value)}
+                      className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Hex Code Input Bar */}
+              <div className="flex items-center space-x-2 pt-1">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono text-[#A6A6B2]">
+                    #
+                  </span>
+                  <input
+                    type="text"
+                    value={customHexInput.replace('#', '')}
+                    onChange={(e) => {
+                      const val = `#${e.target.value.trim()}`;
+                      setCustomHexInput(val);
+                      if (/^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(val)) {
+                        handleApplyCustomColor(val);
+                      }
+                    }}
+                    placeholder="C4B5FD"
+                    maxLength={7}
+                    className="w-full h-9 pl-7 pr-3 rounded-xl bg-[#1D1E23] border border-white/10 text-xs font-mono text-[#F5F4FA] focus:outline-none focus:border-white/30 transition uppercase"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleApplyCustomColor(customHexInput)}
+                  className="h-9 px-3.5 rounded-xl text-xs font-semibold transition flex items-center justify-center shrink-0 active:scale-95 shadow-xs"
+                  style={{ backgroundColor: currentAccent.primary, color: currentAccent.ink }}
+                >
+                  Apply
+                </button>
+              </div>
+
+              {/* Curated Quick Palette Swatches */}
+              <div className="pt-2 border-t border-white/5">
+                <span className="text-[10px] uppercase tracking-wider text-[#A6A6B2] block mb-2 font-medium">
+                  Quick Palette Suggestions
+                </span>
+                <div className="flex items-center flex-wrap gap-1.5">
+                  {QUICK_CUSTOM_PALETTES.map((p) => {
+                    const isCurrent = currentAccent.primary.toLowerCase() === p.hex.toLowerCase();
+                    return (
+                      <button
+                        key={p.hex}
+                        type="button"
+                        onClick={() => handleApplyCustomColor(p.hex)}
+                        className={`h-7 px-2.5 rounded-xl text-[11px] font-medium flex items-center space-x-1.5 transition border ${
+                          isCurrent
+                            ? 'border-white/40 bg-white/10 text-white font-bold'
+                            : 'border-white/5 bg-[#1D1E23] text-[#A6A6B2] hover:text-[#F5F4FA] hover:bg-[#222329]'
+                        }`}
+                      >
+                        <span 
+                          className="w-2.5 h-2.5 rounded-full shadow-xs shrink-0" 
+                          style={{ backgroundColor: p.hex }} 
+                        />
+                        <span>{p.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Appearance Density Toggles */}
           <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  appearance: { ...prev.appearance, showFileExtension: !prev.appearance.showFileExtension },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
               <div>
                 <span className="text-sm font-medium text-[#F5F4FA] block">Show File Extensions</span>
                 <span className="text-xs text-[#A6A6B2]">e.g. .mp4, .mkv in library list</span>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={settings.appearance.showFileExtension}
-                onChange={(e) =>
+                onChange={(checked) =>
                   onUpdateSettings((prev) => ({
                     ...prev,
-                    appearance: { ...prev.appearance, showFileExtension: e.target.checked },
+                    appearance: { ...prev.appearance, showFileExtension: checked },
                   }))
                 }
-                className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Show File Extensions"
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  appearance: { ...prev.appearance, compactPadding: !prev.appearance.compactPadding },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
               <div>
                 <span className="text-sm font-medium text-[#F5F4FA] block">Compact Padding</span>
                 <span className="text-xs text-[#A6A6B2]">Denser list and grid spacing</span>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={settings.appearance.compactPadding}
-                onChange={(e) =>
+                onChange={(checked) =>
                   onUpdateSettings((prev) => ({
                     ...prev,
-                    appearance: { ...prev.appearance, compactPadding: e.target.checked },
+                    appearance: { ...prev.appearance, compactPadding: checked },
                   }))
                 }
-                className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Compact Padding"
               />
             </div>
           </div>
@@ -175,24 +488,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   { id: 'duration', label: 'Duration' },
                   { id: 'size', label: 'File Size' },
                 ] as { id: SortField; label: string }[]
-              ).map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() =>
-                    onUpdateSettings((prev) => ({
-                      ...prev,
-                      library: { ...prev.library, sortField: opt.id },
-                    }))
-                  }
-                  className={`py-2 px-3 rounded-2xl text-xs font-medium transition ${
-                    settings.library.sortField === opt.id
-                      ? 'bg-[#C4B5FD] text-[#241948] font-bold shadow-xs'
-                      : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              ).map((opt) => {
+                const isSelected = settings.library.sortField === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() =>
+                      onUpdateSettings((prev) => ({
+                        ...prev,
+                        library: { ...prev.library, sortField: opt.id },
+                      }))
+                    }
+                    className={`py-2 px-3 rounded-2xl text-xs font-medium transition ${
+                      isSelected
+                        ? 'font-bold shadow-xs'
+                        : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? currentAccent.primary : undefined,
+                      color: isSelected ? currentAccent.ink : undefined,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -206,62 +526,141 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   { id: 'asc', label: 'Ascending (A-Z / Oldest)' },
                   { id: 'desc', label: 'Descending (Z-A / Newest)' },
                 ] as { id: SortOrder; label: string }[]
-              ).map((opt) => (
-                <button
-                  key={opt.id}
-                  onClick={() =>
-                    onUpdateSettings((prev) => ({
-                      ...prev,
-                      library: { ...prev.library, sortOrder: opt.id },
-                    }))
-                  }
-                  className={`py-2 px-3 rounded-2xl text-xs font-medium transition ${
-                    settings.library.sortOrder === opt.id
-                      ? 'bg-[#C4B5FD] text-[#241948] font-bold shadow-xs'
-                      : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              ).map((opt) => {
+                const isSelected = settings.library.sortOrder === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() =>
+                      onUpdateSettings((prev) => ({
+                        ...prev,
+                        library: { ...prev.library, sortOrder: opt.id },
+                      }))
+                    }
+                    className={`py-2 px-3 rounded-2xl text-xs font-medium transition ${
+                      isSelected
+                        ? 'font-bold shadow-xs'
+                        : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? currentAccent.primary : undefined,
+                      color: isSelected ? currentAccent.ink : undefined,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Badges */}
+          {/* Badges and Filter Toggles */}
           <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  library: { ...prev.library, showDurationBadge: !prev.library.showDurationBadge },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
               <div>
                 <span className="text-sm font-medium text-[#F5F4FA] block">Duration Badge</span>
-                <span className="text-xs text-[#A6A6B2]">Show duration overlay on thumbnails</span>
+                <span className="text-xs text-[#A6A6B2]">Show duration overlay pill on thumbnails</span>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={settings.library.showDurationBadge}
-                onChange={(e) =>
+                onChange={(checked) =>
                   onUpdateSettings((prev) => ({
                     ...prev,
-                    library: { ...prev.library, showDurationBadge: e.target.checked },
+                    library: { ...prev.library, showDurationBadge: checked },
                   }))
                 }
-                className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Duration Badge"
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  library: { ...prev.library, showSizeBadge: !prev.library.showSizeBadge },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
+              <div>
+                <span className="text-sm font-medium text-[#F5F4FA] block">File Size Badge</span>
+                <span className="text-xs text-[#A6A6B2]">Display file size (MB / KB) in media items</span>
+              </div>
+              <ToggleSwitch
+                checked={settings.library.showSizeBadge}
+                onChange={(checked) =>
+                  onUpdateSettings((prev) => ({
+                    ...prev,
+                    library: { ...prev.library, showSizeBadge: checked },
+                  }))
+                }
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="File Size Badge"
+              />
+            </div>
+
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  library: { ...prev.library, excludeShortVideos: !prev.library.excludeShortVideos },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
               <div>
                 <span className="text-sm font-medium text-[#F5F4FA] block">Exclude Short Videos</span>
                 <span className="text-xs text-[#A6A6B2]">Hide clips under 10 seconds</span>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={settings.library.excludeShortVideos}
-                onChange={(e) =>
+                onChange={(checked) =>
                   onUpdateSettings((prev) => ({
                     ...prev,
-                    library: { ...prev.library, excludeShortVideos: e.target.checked },
+                    library: { ...prev.library, excludeShortVideos: checked },
                   }))
                 }
-                className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Exclude Short Videos"
+              />
+            </div>
+
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  library: { ...prev.library, rememberFolder: !prev.library.rememberFolder },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
+              <div>
+                <span className="text-sm font-medium text-[#F5F4FA] block">Remember Last Folder</span>
+                <span className="text-xs text-[#A6A6B2]">Reopen your last active folder upon returning</span>
+              </div>
+              <ToggleSwitch
+                checked={settings.library.rememberFolder}
+                onChange={(checked) =>
+                  onUpdateSettings((prev) => ({
+                    ...prev,
+                    library: { ...prev.library, rememberFolder: checked },
+                  }))
+                }
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Remember Last Folder"
               />
             </div>
           </div>
@@ -270,9 +669,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <button
             type="button"
             onClick={onScanLibrary}
-            className="w-full py-3 px-4 rounded-2xl bg-[#26272D] hover:bg-[#32333B] text-[#F5F4FA] text-xs font-semibold flex items-center justify-center space-x-2 transition mt-2"
+            className="w-full py-3 px-4 rounded-2xl bg-[#26272D] hover:bg-[#32333B] text-[#F5F4FA] text-xs font-semibold flex items-center justify-center space-x-2 transition mt-2 active:scale-98"
           >
-            <RefreshCw className="w-4 h-4 text-[#C4B5FD]" />
+            <RefreshCw className="w-4 h-4" style={{ color: currentAccent.primary }} />
             <span>Rescan and Reload Sample Media</span>
           </button>
         </div>
@@ -285,39 +684,138 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       icon: PlayCircle,
       render: () => (
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                player: { ...prev.player, resumePlayback: !prev.player.resumePlayback },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
             <div>
               <span className="text-sm font-medium text-[#F5F4FA] block">Resume Playback Position</span>
               <span className="text-xs text-[#A6A6B2]">Remember last played timestamp for all videos</span>
             </div>
-            <input
-              type="checkbox"
+            <ToggleSwitch
               checked={settings.player.resumePlayback}
-              onChange={(e) =>
+              onChange={(checked) =>
                 onUpdateSettings((prev) => ({
                   ...prev,
-                  player: { ...prev.player, resumePlayback: e.target.checked },
+                  player: { ...prev.player, resumePlayback: checked },
                 }))
               }
-              className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Resume Playback Position"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                player: { ...prev.player, autoPlayNext: !prev.player.autoPlayNext },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
             <div>
               <span className="text-sm font-medium text-[#F5F4FA] block">Auto-play Next Video</span>
               <span className="text-xs text-[#A6A6B2]">Continuously play next video in the folder</span>
             </div>
-            <input
-              type="checkbox"
+            <ToggleSwitch
               checked={settings.player.autoPlayNext}
-              onChange={(e) =>
+              onChange={(checked) =>
                 onUpdateSettings((prev) => ({
                   ...prev,
-                  player: { ...prev.player, autoPlayNext: e.target.checked },
+                  player: { ...prev.player, autoPlayNext: checked },
                 }))
               }
-              className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Auto-play Next Video"
+            />
+          </div>
+
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                player: { ...prev.player, backgroundAudio: !prev.player.backgroundAudio },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
+            <div>
+              <span className="text-sm font-medium text-[#F5F4FA] block">Background Audio Playback</span>
+              <span className="text-xs text-[#A6A6B2]">Keep audio playing when app window is unfocused</span>
+            </div>
+            <ToggleSwitch
+              checked={settings.player.backgroundAudio}
+              onChange={(checked) =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  player: { ...prev.player, backgroundAudio: checked },
+                }))
+              }
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Background Audio Playback"
+            />
+          </div>
+
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                player: { ...prev.player, enablePiP: !prev.player.enablePiP },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
+            <div>
+              <span className="text-sm font-medium text-[#F5F4FA] block">Picture-in-Picture Quick Icon</span>
+              <span className="text-xs text-[#A6A6B2]">Show floating PiP button in player header</span>
+            </div>
+            <ToggleSwitch
+              checked={settings.player.enablePiP}
+              onChange={(checked) =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  player: { ...prev.player, enablePiP: checked },
+                }))
+              }
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Picture-in-Picture Quick Icon"
+            />
+          </div>
+
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                player: { ...prev.player, rememberBrightness: !prev.player.rememberBrightness },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
+            <div>
+              <span className="text-sm font-medium text-[#F5F4FA] block">Remember Brightness Level</span>
+              <span className="text-xs text-[#A6A6B2]">Maintain your custom screen brightness per video</span>
+            </div>
+            <ToggleSwitch
+              checked={settings.player.rememberBrightness}
+              onChange={(checked) =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  player: { ...prev.player, rememberBrightness: checked },
+                }))
+              }
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Remember Brightness Level"
             />
           </div>
 
@@ -326,24 +824,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               Double-Tap Seek Interval
             </label>
             <div className="grid grid-cols-4 gap-2">
-              {[5, 10, 15, 30].map((sec) => (
-                <button
-                  key={sec}
-                  onClick={() =>
-                    onUpdateSettings((prev) => ({
-                      ...prev,
-                      player: { ...prev.player, doubleTapSeekSeconds: sec },
-                    }))
-                  }
-                  className={`py-2 px-2.5 rounded-2xl text-xs font-medium transition ${
-                    settings.player.doubleTapSeekSeconds === sec
-                      ? 'bg-[#C4B5FD] text-[#241948] font-bold shadow-xs'
-                      : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
-                  }`}
-                >
-                  ±{sec}s
-                </button>
-              ))}
+              {[5, 10, 15, 30].map((sec) => {
+                const isSelected = settings.player.doubleTapSeekSeconds === sec;
+                return (
+                  <button
+                    key={sec}
+                    onClick={() =>
+                      onUpdateSettings((prev) => ({
+                        ...prev,
+                        player: { ...prev.player, doubleTapSeekSeconds: sec },
+                      }))
+                    }
+                    className={`py-2 px-2.5 rounded-2xl text-xs font-medium transition ${
+                      isSelected
+                        ? 'font-bold shadow-xs'
+                        : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? currentAccent.primary : undefined,
+                      color: isSelected ? currentAccent.ink : undefined,
+                    }}
+                  >
+                    ±{sec}s
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -352,24 +857,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               Controller Auto-Hide Timeout
             </label>
             <div className="grid grid-cols-4 gap-2">
-              {[2, 3, 5, 10].map((sec) => (
-                <button
-                  key={sec}
-                  onClick={() =>
-                    onUpdateSettings((prev) => ({
-                      ...prev,
-                      player: { ...prev.player, controllerTimeoutSec: sec },
-                    }))
-                  }
-                  className={`py-2 px-2.5 rounded-2xl text-xs font-medium transition ${
-                    settings.player.controllerTimeoutSec === sec
-                      ? 'bg-[#C4B5FD] text-[#241948] font-bold shadow-xs'
-                      : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
-                  }`}
-                >
-                  {sec}s
-                </button>
-              ))}
+              {[2, 3, 5, 10].map((sec) => {
+                const isSelected = settings.player.controllerTimeoutSec === sec;
+                return (
+                  <button
+                    key={sec}
+                    onClick={() =>
+                      onUpdateSettings((prev) => ({
+                        ...prev,
+                        player: { ...prev.player, controllerTimeoutSec: sec },
+                      }))
+                    }
+                    className={`py-2 px-2.5 rounded-2xl text-xs font-medium transition ${
+                      isSelected
+                        ? 'font-bold shadow-xs'
+                        : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? currentAccent.primary : undefined,
+                      color: isSelected ? currentAccent.ink : undefined,
+                    }}
+                  >
+                    {sec}s
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -387,93 +899,138 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </p>
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  gestures: { ...prev.gestures, enableVerticalBrightness: !prev.gestures.enableVerticalBrightness },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
               <div>
                 <span className="text-sm font-medium text-[#F5F4FA] block">Vertical Swipe: Brightness</span>
                 <span className="text-xs text-[#A6A6B2]">Drag left half of screen to adjust screen light</span>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={settings.gestures.enableVerticalBrightness}
-                onChange={(e) =>
+                onChange={(checked) =>
                   onUpdateSettings((prev) => ({
                     ...prev,
-                    gestures: { ...prev.gestures, enableVerticalBrightness: e.target.checked },
+                    gestures: { ...prev.gestures, enableVerticalBrightness: checked },
                   }))
                 }
-                className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Vertical Swipe: Brightness"
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  gestures: { ...prev.gestures, enableVerticalVolume: !prev.gestures.enableVerticalVolume },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
               <div>
                 <span className="text-sm font-medium text-[#F5F4FA] block">Vertical Swipe: Volume</span>
                 <span className="text-xs text-[#A6A6B2]">Drag right half of screen to adjust volume</span>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={settings.gestures.enableVerticalVolume}
-                onChange={(e) =>
+                onChange={(checked) =>
                   onUpdateSettings((prev) => ({
                     ...prev,
-                    gestures: { ...prev.gestures, enableVerticalVolume: e.target.checked },
+                    gestures: { ...prev.gestures, enableVerticalVolume: checked },
                   }))
                 }
-                className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Vertical Swipe: Volume"
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  gestures: { ...prev.gestures, enableHorizontalSeek: !prev.gestures.enableHorizontalSeek },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
               <div>
                 <span className="text-sm font-medium text-[#F5F4FA] block">Horizontal Swipe: Scrub Seek</span>
                 <span className="text-xs text-[#A6A6B2]">Drag horizontally to scrub through timeline</span>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={settings.gestures.enableHorizontalSeek}
-                onChange={(e) =>
+                onChange={(checked) =>
                   onUpdateSettings((prev) => ({
                     ...prev,
-                    gestures: { ...prev.gestures, enableHorizontalSeek: e.target.checked },
+                    gestures: { ...prev.gestures, enableHorizontalSeek: checked },
                   }))
                 }
-                className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Horizontal Swipe: Scrub Seek"
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  gestures: { ...prev.gestures, enableDoubleTapSeek: !prev.gestures.enableDoubleTapSeek },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
               <div>
                 <span className="text-sm font-medium text-[#F5F4FA] block">Double-Tap to Seek</span>
                 <span className="text-xs text-[#A6A6B2]">Tap left or right edge twice to skip seconds</span>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={settings.gestures.enableDoubleTapSeek}
-                onChange={(e) =>
+                onChange={(checked) =>
                   onUpdateSettings((prev) => ({
                     ...prev,
-                    gestures: { ...prev.gestures, enableDoubleTapSeek: e.target.checked },
+                    gestures: { ...prev.gestures, enableDoubleTapSeek: checked },
                   }))
                 }
-                className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Double-Tap to Seek"
               />
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+            <div 
+              onClick={() =>
+                onUpdateSettings((prev) => ({
+                  ...prev,
+                  gestures: { ...prev.gestures, enableLongPressFastForward: !prev.gestures.enableLongPressFastForward },
+                }))
+              }
+              className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+            >
               <div>
                 <span className="text-sm font-medium text-[#F5F4FA] block">Long Press: 2x Fast-Forward</span>
                 <span className="text-xs text-[#A6A6B2]">Hold down anywhere to temporarily accelerate</span>
               </div>
-              <input
-                type="checkbox"
+              <ToggleSwitch
                 checked={settings.gestures.enableLongPressFastForward}
-                onChange={(e) =>
+                onChange={(checked) =>
                   onUpdateSettings((prev) => ({
                     ...prev,
-                    gestures: { ...prev.gestures, enableLongPressFastForward: e.target.checked },
+                    gestures: { ...prev.gestures, enableLongPressFastForward: checked },
                   }))
                 }
-                className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+                accentColor={currentAccent.primary}
+                accentInk={currentAccent.ink}
+                ariaLabel="Long Press: 2x Fast-Forward"
               />
             </div>
           </div>
@@ -487,57 +1044,84 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       icon: Volume2,
       render: () => (
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D]">
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                audio: { ...prev.audio, volumeBoost: !prev.audio.volumeBoost },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
             <div>
               <span className="text-sm font-medium text-[#F5F4FA] block">Volume Boost (200%)</span>
               <span className="text-xs text-[#A6A6B2]">Amplifies quiet media tracks beyond normal max</span>
             </div>
-            <input
-              type="checkbox"
+            <ToggleSwitch
               checked={settings.audio.volumeBoost}
-              onChange={(e) =>
+              onChange={(checked) =>
                 onUpdateSettings((prev) => ({
                   ...prev,
-                  audio: { ...prev.audio, volumeBoost: e.target.checked },
+                  audio: { ...prev.audio, volumeBoost: checked },
                 }))
               }
-              className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Volume Boost (200%)"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D]">
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                audio: { ...prev.audio, nightModeSpeechClarity: !prev.audio.nightModeSpeechClarity },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
             <div>
               <span className="text-sm font-medium text-[#F5F4FA] block">Night Mode (Speech Clarity)</span>
               <span className="text-xs text-[#A6A6B2]">Compresses explosions while boosting spoken dialogues</span>
             </div>
-            <input
-              type="checkbox"
+            <ToggleSwitch
               checked={settings.audio.nightModeSpeechClarity}
-              onChange={(e) =>
+              onChange={(checked) =>
                 onUpdateSettings((prev) => ({
                   ...prev,
-                  audio: { ...prev.audio, nightModeSpeechClarity: e.target.checked },
+                  audio: { ...prev.audio, nightModeSpeechClarity: checked },
                 }))
               }
-              className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Night Mode (Speech Clarity)"
             />
           </div>
 
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D]">
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                audio: { ...prev.audio, muteOnStart: !prev.audio.muteOnStart },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
             <div>
               <span className="text-sm font-medium text-[#F5F4FA] block">Mute on Start</span>
               <span className="text-xs text-[#A6A6B2]">Always start new videos with sound muted</span>
             </div>
-            <input
-              type="checkbox"
+            <ToggleSwitch
               checked={settings.audio.muteOnStart}
-              onChange={(e) =>
+              onChange={(checked) =>
                 onUpdateSettings((prev) => ({
                   ...prev,
-                  audio: { ...prev.audio, muteOnStart: e.target.checked },
+                  audio: { ...prev.audio, muteOnStart: checked },
                 }))
               }
-              className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Mute on Start"
             />
           </div>
         </div>
@@ -550,21 +1134,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       icon: Subtitles,
       render: () => (
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-[#26272D]">
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                subtitles: { ...prev.subtitles, enabled: !prev.subtitles.enabled },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
             <div>
               <span className="text-sm font-medium text-[#F5F4FA] block">Enable Subtitles</span>
               <span className="text-xs text-[#A6A6B2]">Show subtitles automatically when available</span>
             </div>
-            <input
-              type="checkbox"
+            <ToggleSwitch
               checked={settings.subtitles.enabled}
-              onChange={(e) =>
+              onChange={(checked) =>
                 onUpdateSettings((prev) => ({
                   ...prev,
-                  subtitles: { ...prev.subtitles, enabled: e.target.checked },
+                  subtitles: { ...prev.subtitles, enabled: checked },
                 }))
               }
-              className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Enable Subtitles"
             />
           </div>
 
@@ -573,24 +1166,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               Font Size
             </label>
             <div className="grid grid-cols-4 gap-2">
-              {(['small', 'medium', 'large', 'xlarge'] as const).map((sz) => (
-                <button
-                  key={sz}
-                  onClick={() =>
-                    onUpdateSettings((prev) => ({
-                      ...prev,
-                      subtitles: { ...prev.subtitles, fontSize: sz },
-                    }))
-                  }
-                  className={`py-2 px-2 rounded-2xl text-xs font-medium capitalize transition ${
-                    settings.subtitles.fontSize === sz
-                      ? 'bg-[#C4B5FD] text-[#241948] font-bold shadow-xs'
-                      : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
-                  }`}
-                >
-                  {sz}
-                </button>
-              ))}
+              {(['small', 'medium', 'large', 'xlarge'] as const).map((sz) => {
+                const isSelected = settings.subtitles.fontSize === sz;
+                return (
+                  <button
+                    key={sz}
+                    onClick={() =>
+                      onUpdateSettings((prev) => ({
+                        ...prev,
+                        subtitles: { ...prev.subtitles, fontSize: sz },
+                      }))
+                    }
+                    className={`py-2 px-2 rounded-2xl text-xs font-medium capitalize transition ${
+                      isSelected
+                        ? 'font-bold shadow-xs'
+                        : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? currentAccent.primary : undefined,
+                      color: isSelected ? currentAccent.ink : undefined,
+                    }}
+                  >
+                    {sz}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -599,24 +1199,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               Text Color
             </label>
             <div className="grid grid-cols-4 gap-2">
-              {(['white', 'yellow', 'cyan', 'green'] as const).map((col) => (
-                <button
-                  key={col}
-                  onClick={() =>
-                    onUpdateSettings((prev) => ({
-                      ...prev,
-                      subtitles: { ...prev.subtitles, textColor: col },
-                    }))
-                  }
-                  className={`py-2 px-2 rounded-2xl text-xs font-medium capitalize transition ${
-                    settings.subtitles.textColor === col
-                      ? 'bg-[#C4B5FD] text-[#241948] font-bold shadow-xs'
-                      : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
-                  }`}
-                >
-                  {col}
-                </button>
-              ))}
+              {(['white', 'yellow', 'cyan', 'green'] as const).map((col) => {
+                const isSelected = settings.subtitles.textColor === col;
+                return (
+                  <button
+                    key={col}
+                    onClick={() =>
+                      onUpdateSettings((prev) => ({
+                        ...prev,
+                        subtitles: { ...prev.subtitles, textColor: col },
+                      }))
+                    }
+                    className={`py-2 px-2 rounded-2xl text-xs font-medium capitalize transition ${
+                      isSelected
+                        ? 'font-bold shadow-xs'
+                        : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? currentAccent.primary : undefined,
+                      color: isSelected ? currentAccent.ink : undefined,
+                    }}
+                  >
+                    {col}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -625,24 +1232,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               Background Box
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {(['transparent', 'semi-black', 'black'] as const).map((bg) => (
-                <button
-                  key={bg}
-                  onClick={() =>
-                    onUpdateSettings((prev) => ({
-                      ...prev,
-                      subtitles: { ...prev.subtitles, backgroundColor: bg },
-                    }))
-                  }
-                  className={`py-2 px-2 rounded-2xl text-xs font-medium capitalize transition ${
-                    settings.subtitles.backgroundColor === bg
-                      ? 'bg-[#C4B5FD] text-[#241948] font-bold shadow-xs'
-                      : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
-                  }`}
-                >
-                  {bg}
-                </button>
-              ))}
+              {(['transparent', 'semi-black', 'black'] as const).map((bg) => {
+                const isSelected = settings.subtitles.backgroundColor === bg;
+                return (
+                  <button
+                    key={bg}
+                    onClick={() =>
+                      onUpdateSettings((prev) => ({
+                        ...prev,
+                        subtitles: { ...prev.subtitles, backgroundColor: bg },
+                      }))
+                    }
+                    className={`py-2 px-2 rounded-2xl text-xs font-medium capitalize transition ${
+                      isSelected
+                        ? 'font-bold shadow-xs'
+                        : 'bg-[#26272D] text-[#F5F4FA] hover:bg-[#32333B]'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? currentAccent.primary : undefined,
+                      color: isSelected ? currentAccent.ink : undefined,
+                    }}
+                  >
+                    {bg}
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -655,28 +1269,37 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       icon: History,
       render: () => (
         <div className="space-y-4">
-          <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D]">
+          <div 
+            onClick={() =>
+              onUpdateSettings((prev) => ({
+                ...prev,
+                history: { ...prev.history, trackHistory: !prev.history.trackHistory },
+              }))
+            }
+            className="flex items-center justify-between p-3.5 rounded-2xl bg-[#26272D] hover:bg-[#2F3038] cursor-pointer transition"
+          >
             <div>
               <span className="text-sm font-medium text-[#F5F4FA] block">Track Watch History</span>
               <span className="text-xs text-[#A6A6B2]">Store watch progress and continue points</span>
             </div>
-            <input
-              type="checkbox"
+            <ToggleSwitch
               checked={settings.history.trackHistory}
-              onChange={(e) =>
+              onChange={(checked) =>
                 onUpdateSettings((prev) => ({
                   ...prev,
-                  history: { ...prev.history, trackHistory: e.target.checked },
+                  history: { ...prev.history, trackHistory: checked },
                 }))
               }
-              className="w-4 h-4 accent-[#C4B5FD] rounded cursor-pointer"
+              accentColor={currentAccent.primary}
+              accentInk={currentAccent.ink}
+              ariaLabel="Track Watch History"
             />
           </div>
 
           <button
             type="button"
             onClick={onClearHistory}
-            className="w-full py-3 px-4 rounded-2xl bg-red-950/40 hover:bg-red-900/50 border border-red-500/20 text-red-200 text-xs font-semibold flex items-center justify-center space-x-2 transition"
+            className="w-full py-3 px-4 rounded-2xl bg-red-950/40 hover:bg-red-900/50 border border-red-500/20 text-red-200 text-xs font-semibold flex items-center justify-center space-x-2 transition active:scale-98"
           >
             <Trash2 className="w-4 h-4" />
             <span>Clear Watch History</span>
@@ -713,7 +1336,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="space-y-4">
           <div className="p-4 rounded-2xl bg-[#26272D] text-center">
             <h4 className="text-lg font-bold text-[#F5F4FA]">PixelFlow</h4>
-            <p className="text-xs text-[#C4B5FD] mt-0.5 font-medium">Version 0.1.1</p>
+            <p className="text-xs mt-0.5 font-medium" style={{ color: currentAccent.primary }}>
+              Version 0.1.1
+            </p>
             <p className="text-xs text-[#A6A6B2] mt-2 leading-relaxed">
               A modern, minimal video player and media space with gesture controls, audio boost, and advanced library browsing.
             </p>
@@ -741,11 +1366,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <span>Watch history & continue watching row</span>
               </li>
               <li className="flex items-center space-x-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#C4B5FD] shrink-0" />
+                <span 
+                  className="w-1.5 h-1.5 rounded-full shrink-0" 
+                  style={{ backgroundColor: currentAccent.primary }}
+                />
                 <span>OpenSubtitles.org online subtitle search & download</span>
               </li>
               <li className="flex items-center space-x-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#C4B5FD] shrink-0" />
+                <span 
+                  className="w-1.5 h-1.5 rounded-full shrink-0" 
+                  style={{ backgroundColor: currentAccent.primary }}
+                />
                 <span>SMB / WebDAV / SFTP remote credentials connector</span>
               </li>
             </ul>
@@ -768,7 +1399,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {activeSection ? (
             <button
               onClick={() => setActiveSection(null)}
-              className="flex items-center space-x-1.5 text-xs text-[#C4B5FD] hover:text-[#D8CCFF] font-medium"
+              className="flex items-center space-x-1.5 text-xs font-medium transition"
+              style={{ color: currentAccent.primary }}
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Back to Settings</span>

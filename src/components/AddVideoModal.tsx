@@ -8,6 +8,8 @@ interface AddVideoModalProps {
   onClose: () => void;
   onAddVideos: (videos: VideoEntry[]) => void;
   folders: string[];
+  accentColor?: string;
+  accentInk?: string;
 }
 
 export const AddVideoModal: React.FC<AddVideoModalProps> = ({
@@ -15,6 +17,8 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
   onClose,
   onAddVideos,
   folders,
+  accentColor = '#C4B5FD',
+  accentInk = '#241948',
 }) => {
   const [tab, setTab] = useState<'files' | 'url'>('files');
   const [url, setUrl] = useState('');
@@ -109,9 +113,13 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
             onClick={() => setTab('files')}
             className={`py-2 px-3 rounded-2xl text-xs font-medium transition flex items-center justify-center space-x-2 ${
               tab === 'files'
-                ? 'bg-[#C4B5FD] text-[#241948] font-semibold'
+                ? 'font-semibold shadow-xs'
                 : 'bg-[#26272D] text-[#A6A6B2] hover:text-[#F5F4FA]'
             }`}
+            style={{
+              backgroundColor: tab === 'files' ? accentColor : undefined,
+              color: tab === 'files' ? accentInk : undefined,
+            }}
           >
             <Upload className="w-4 h-4" />
             <span>Local Device Files</span>
@@ -121,9 +129,13 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
             onClick={() => setTab('url')}
             className={`py-2 px-3 rounded-2xl text-xs font-medium transition flex items-center justify-center space-x-2 ${
               tab === 'url'
-                ? 'bg-[#C4B5FD] text-[#241948] font-semibold'
+                ? 'font-semibold shadow-xs'
                 : 'bg-[#26272D] text-[#A6A6B2] hover:text-[#F5F4FA]'
             }`}
+            style={{
+              backgroundColor: tab === 'url' ? accentColor : undefined,
+              color: tab === 'url' ? accentInk : undefined,
+            }}
           >
             <Link className="w-4 h-4" />
             <span>Direct Video URL</span>
@@ -139,7 +151,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
               <select
                 value={selectedFolder}
                 onChange={(e) => setSelectedFolder(e.target.value)}
-                className="w-full py-2.5 px-3 rounded-2xl bg-[#26272D] border border-[#3B3D47] text-xs text-[#F5F4FA] focus:outline-none focus:border-[#C4B5FD]"
+                className="w-full py-2.5 px-3 rounded-2xl bg-[#26272D] border border-[#3B3D47] text-xs text-[#F5F4FA] focus:outline-none focus:border-white/40"
               >
                 {folders.map((f) => (
                   <option key={f} value={f}>
@@ -152,7 +164,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
 
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-[#3B3D47] hover:border-[#C4B5FD] rounded-2xl p-6 text-center cursor-pointer transition bg-[#101114]/50 group"
+              className="border-2 border-dashed border-[#3B3D47] hover:border-white/40 rounded-2xl p-6 text-center cursor-pointer transition bg-[#101114]/50 group"
             >
               <input
                 ref={fileInputRef}
@@ -162,7 +174,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                 className="hidden"
                 onChange={handleFilesSelected}
               />
-              <FileVideo className="w-10 h-10 text-[#C4B5FD] mx-auto mb-2 group-hover:scale-110 transition duration-200" />
+              <FileVideo className="w-10 h-10 mx-auto mb-2 group-hover:scale-110 transition duration-200" style={{ color: accentColor }} />
               <p className="text-sm font-medium text-[#F5F4FA]">
                 {isProcessing ? 'Processing video metadata…' : 'Tap to browse or drop videos'}
               </p>
@@ -183,7 +195,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                 placeholder="https://example.com/video.mp4"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="w-full py-2.5 px-3 rounded-2xl bg-[#26272D] border border-[#3B3D47] text-xs text-[#F5F4FA] focus:outline-none focus:border-[#C4B5FD]"
+                className="w-full py-2.5 px-3 rounded-2xl bg-[#26272D] border border-[#3B3D47] text-xs text-[#F5F4FA] focus:outline-none focus:border-white/40"
               />
             </div>
 
@@ -196,7 +208,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
                 placeholder="My Video Name"
                 value={urlName}
                 onChange={(e) => setUrlName(e.target.value)}
-                className="w-full py-2.5 px-3 rounded-2xl bg-[#26272D] border border-[#3B3D47] text-xs text-[#F5F4FA] focus:outline-none focus:border-[#C4B5FD]"
+                className="w-full py-2.5 px-3 rounded-2xl bg-[#26272D] border border-[#3B3D47] text-xs text-[#F5F4FA] focus:outline-none focus:border-white/40"
               />
             </div>
 
@@ -207,7 +219,7 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
               <select
                 value={urlFolder}
                 onChange={(e) => setUrlFolder(e.target.value)}
-                className="w-full py-2.5 px-3 rounded-2xl bg-[#26272D] border border-[#3B3D47] text-xs text-[#F5F4FA] focus:outline-none focus:border-[#C4B5FD]"
+                className="w-full py-2.5 px-3 rounded-2xl bg-[#26272D] border border-[#3B3D47] text-xs text-[#F5F4FA] focus:outline-none focus:border-white/40"
               >
                 {folders.map((f) => (
                   <option key={f} value={f}>
@@ -220,7 +232,8 @@ export const AddVideoModal: React.FC<AddVideoModalProps> = ({
 
             <button
               type="submit"
-              className="w-full py-3 px-4 rounded-2xl bg-[#C4B5FD] text-[#241948] font-semibold text-xs hover:bg-[#D8CCFF] transition shadow-xs flex items-center justify-center space-x-2"
+              className="w-full py-3 px-4 rounded-2xl font-semibold text-xs transition shadow-xs flex items-center justify-center space-x-2 active:scale-98"
+              style={{ backgroundColor: accentColor, color: accentInk }}
             >
               <Plus className="w-4 h-4" />
               <span>Add Video to Library</span>

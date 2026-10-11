@@ -1,6 +1,7 @@
 {
   "appId": "app.pixelflow.player",
   "productName": "PixelFlow",
+  "electronVersion": "34.0.0",
   "copyright": "Copyright © 2026 PixelFlow Contributors",
   "directories": {
     "output": "dist-desktop",

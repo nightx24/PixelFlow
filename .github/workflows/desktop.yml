@@ -35,10 +35,10 @@ jobs:
         run: npm run build
 
       - name: Package Linux (AppImage & deb)
-        run: npx electron-builder --linux AppImage deb --publish never
+        run: npx --yes electron-builder --linux AppImage deb --publish never
 
       - name: Package Fedora RPM
-        run: npx electron-builder --linux rpm --publish never
+        run: npx --yes electron-builder --linux rpm --publish never
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -70,7 +70,7 @@ jobs:
         run: npm run build
 
       - name: Package Windows (NSIS & Portable)
-        run: npx electron-builder --win nsis portable --publish never
+        run: npx --yes electron-builder --win nsis portable --publish never
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4

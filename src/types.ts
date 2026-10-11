@@ -43,16 +43,19 @@ export type LayoutMode = 'List' | 'Grid';
 export type SortField = 'name' | 'dateAdded' | 'duration' | 'size';
 export type SortOrder = 'asc' | 'desc';
 
-export type ThemeMode = 'dark' | 'amoled' | 'light';
-export type AccentColor = 'lavender' | 'violet' | 'emerald' | 'blue' | 'amber' | 'rose';
+export type ThemeMode = 'dark' | 'material-you' | 'amoled' | 'light';
+export type AccentColor = 'lavender' | 'violet' | 'emerald' | 'blue' | 'amber' | 'rose' | 'coral' | 'cyan' | 'lime' | 'custom';
 
 export interface PixelFlowSettings {
   // Appearance
   appearance: {
     themeMode: ThemeMode;
     accentColor: AccentColor;
+    customAccentHex?: string;
     showFileExtension: boolean;
     compactPadding: boolean;
+    enableGlassUI: boolean;
+    glassIntensity: 'subtle' | 'medium' | 'deep';
   };
 
   // Media Library
@@ -92,12 +95,28 @@ export interface PixelFlowSettings {
     fastForwardSpeed: number; // e.g. 2.0x
   };
 
-  // Audio
+  // Audio & VLC Equalizer
   audio: {
     volumeBoost: boolean; // Up to 200%
     nightModeSpeechClarity: boolean; // DynamicsCompressor
     audioDelayMs: number;
     muteOnStart: boolean;
+    equalizerEnabled: boolean;
+    equalizerPreset: EqualizerPreset;
+    equalizerGains: number[]; // 10 bands
+    preampGain: number; // in dB
+  };
+
+  // VLC Video Effects (Post-processing)
+  videoEffects: {
+    enabled: boolean;
+    brightness: number; // 50 to 200% (default 100)
+    contrast: number; // 50 to 200% (default 100)
+    saturation: number; // 0 to 300% (default 100)
+    hueRotate: number; // -180 to 180 deg (default 0)
+    gamma: number; // 0.5 to 2.0 (default 1.0)
+    invert: boolean;
+    sepia: boolean;
   };
 
   // Subtitles
@@ -115,6 +134,28 @@ export interface PixelFlowSettings {
     trackHistory: boolean;
     maxHistoryItems: number;
   };
+}
+
+export type EqualizerPreset = 
+  | 'flat' 
+  | 'rock' 
+  | 'pop' 
+  | 'classical' 
+  | 'techno' 
+  | 'dance' 
+  | 'bass_boost' 
+  | 'treble_boost' 
+  | 'vocal' 
+  | 'club' 
+  | 'live' 
+  | 'party' 
+  | 'reggae' 
+  | 'custom';
+
+export interface ABRepeat {
+  pointA: number | null; // seconds
+  pointB: number | null; // seconds
+  enabled: boolean;
 }
 
 declare global {

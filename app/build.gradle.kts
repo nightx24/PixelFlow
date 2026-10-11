@@ -16,8 +16,29 @@ android {
         applicationId = "app.pixelflow.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
+    }
+
+    // Optional stable signing for CI-generated test APKs. Configure GitHub Actions
+    // secrets to enable it; without them, Android's normal debug key is used.
+    val stableKeystore = System.getenv("PIXELFLOW_KEYSTORE_FILE")
+    val stableKeyAlias = System.getenv("PIXELFLOW_KEY_ALIAS")
+    val stableKeyPassword = System.getenv("PIXELFLOW_KEY_PASSWORD")
+    val stableStorePassword = System.getenv("PIXELFLOW_STORE_PASSWORD")
+
+    if (!stableKeystore.isNullOrBlank() &&
+        !stableKeyAlias.isNullOrBlank() &&
+        !stableKeyPassword.isNullOrBlank() &&
+        !stableStorePassword.isNullOrBlank()
+    ) {
+        signingConfigs.create("stable") {
+            storeFile = file(stableKeystore)
+            keyAlias = stableKeyAlias
+            keyPassword = stableKeyPassword
+            storePassword = stableStorePassword
+        }
+        buildTypes.getByName("debug").signingConfig = signingConfigs.getByName("stable")
     }
 }
 

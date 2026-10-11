@@ -125,7 +125,8 @@ class MainActivity : Activity() {
         }
         val searchParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50))
         searchParams.topMargin = dp(20)
-        searchInput.visibility = View.GONE\n        root.addView(searchInput, searchParams)
+        searchInput.visibility = View.GONE
+        root.addView(searchInput, searchParams)
 
         val tabs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL

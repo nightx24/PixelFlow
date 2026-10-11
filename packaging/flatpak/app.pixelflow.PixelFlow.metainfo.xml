@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>app.pixelflow.PixelFlow</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>PixelFlow</name>
+  <summary>A minimal video player and media space with gesture controls</summary>
+  <description>
+    <p>
+      PixelFlow is a modern media player offering a clean dark theme, folder-based browsing,
+      and on-screen touch and mouse gestures for rapid brightness, volume, and timeline scrub control.
+    </p>
+    <ul>
+      <li>Vertical gestures for display brightness and audio volume with real-time HUD meters</li>
+      <li>Audio volume boost up to 200% and night mode speech clarity</li>
+      <li>Custom SRT/VTT subtitle loader with extensive styling options</li>
+      <li>Organized folder and video views with continue watching watch history</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">app.pixelflow.PixelFlow.desktop</launchable>
+  <url type="homepage">https://github.com/nightx24/PixelFlow</url>
+  <provides>
+    <mediatype>video/mp4</mediatype>
+    <mediatype>video/x-matroska</mediatype>
+    <mediatype>video/webm</mediatype>
+    <mediatype>video/quicktime</mediatype>
+  </provides>
+  <releases>
+    <release version="0.1.1" date="2026-10-11"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

@@ -1,0 +1,15 @@
+Source: pixelflow
+Section: video
+Priority: optional
+Maintainer: PixelFlow Contributors <support@pixelflow.app>
+Build-Depends: debhelper-compat (= 13), nodejs, npm
+Standards-Version: 4.6.0
+Homepage: https://github.com/nightx24/PixelFlow
+
+Package: pixelflow
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, libnotify4, libnss3, libasound2
+Description: Minimal, high-performance media player and video space
+ PixelFlow is a modern, minimal video player and media space featuring
+ intuitive swipe gestures for brightness and volume, Web Audio volume boost up to 200%,
+ subtitles customization, and seamless folder-based media organization.

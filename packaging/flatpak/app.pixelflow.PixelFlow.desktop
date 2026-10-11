@@ -1,0 +1,17 @@
+[Desktop Entry]
+Name=PixelFlow
+Comment=A minimal video player and media space with gesture controls
+GenericName=Video Player
+Exec=pixelflow %U
+Terminal=false
+Type=Application
+Icon=app.pixelflow.PixelFlow
+StartupWMClass=PixelFlow
+Categories=AudioVideo;Video;Player;
+MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/ogg;
+Keywords=video;player;movie;media;mp4;mkv;webm;
+Actions=NewWindow;
+
+[Desktop Action NewWindow]
+Name=New Window
+Exec=pixelflow --new-window

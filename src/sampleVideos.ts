@@ -5,28 +5,67 @@ export const INITIAL_VIDEOS: VideoEntry[] = [
     id: 'sample-1',
     name: 'Big_Buck_Bunny_1080p.mp4',
     url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-    durationMs: 596000, // 9:56
-    sizeBytes: 158200000, // ~150.9 MB
+    durationMs: 596000,
+    sizeBytes: 158200000,
     folder: 'Movies',
     thumbnailUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&auto=format&fit=crop&q=80',
     dateAdded: Date.now() - 1000 * 60 * 60 * 24 * 3,
+    subtitles: [
+      {
+        id: 'sub-en',
+        label: 'English [CC]',
+        language: 'en',
+        cues: [
+          { startTime: 2, endTime: 6, text: 'PixelFlow · High Performance Media Engine' },
+          { startTime: 7, endTime: 12, text: 'Big Buck Bunny waking up in the morning forest' },
+          { startTime: 14, endTime: 18, text: 'A gentle breeze rustles through the grass' },
+          { startTime: 20, endTime: 26, text: 'Watch out for the mischievous flying squirrels!' },
+          { startTime: 28, endTime: 34, text: 'Swipe vertically on left to adjust Brightness' },
+          { startTime: 35, endTime: 42, text: 'Swipe vertically on right to adjust Volume' },
+          { startTime: 43, endTime: 50, text: 'Swipe horizontally to scrub back or forward' },
+        ],
+      },
+      {
+        id: 'sub-es',
+        label: 'Español',
+        language: 'es',
+        cues: [
+          { startTime: 2, endTime: 6, text: 'PixelFlow · Reproductor de Alto Rendimiento' },
+          { startTime: 7, endTime: 12, text: 'Big Buck Bunny despertando en el bosque' },
+          { startTime: 28, endTime: 35, text: 'Desliza verticalmente a la izquierda para el Brillo' },
+          { startTime: 36, endTime: 45, text: 'Desliza verticalmente a la derecha para el Volumen' },
+        ],
+      },
+    ],
   },
   {
     id: 'sample-2',
     name: 'Tears_of_Steel_4K_Teaser.mp4',
     url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-    durationMs: 734000, // 12:14
-    sizeBytes: 198500000, // ~189.3 MB
+    durationMs: 734000,
+    sizeBytes: 198500000,
     folder: 'Movies',
     thumbnailUrl: 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=500&auto=format&fit=crop&q=80',
     dateAdded: Date.now() - 1000 * 60 * 60 * 24 * 2,
+    subtitles: [
+      {
+        id: 'sub-en-tos',
+        label: 'English [Official]',
+        language: 'en',
+        cues: [
+          { startTime: 1, endTime: 5, text: 'Blender Foundation presents Tears of Steel' },
+          { startTime: 6, endTime: 11, text: 'Exploring dystopian robotics in Amsterdam' },
+          { startTime: 15, endTime: 22, text: 'Double-tap left/right anywhere to seek ±10 seconds' },
+        ],
+      },
+    ],
   },
   {
     id: 'sample-3',
     name: 'Elephants_Dream_OpenMovie.mp4',
     url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-    durationMs: 653000, // 10:53
-    sizeBytes: 142000000, // ~135.4 MB
+    durationMs: 653000,
+    sizeBytes: 142000000,
     folder: 'Movies',
     thumbnailUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=500&auto=format&fit=crop&q=80',
     dateAdded: Date.now() - 1000 * 60 * 60 * 24 * 5,
@@ -35,8 +74,8 @@ export const INITIAL_VIDEOS: VideoEntry[] = [
     id: 'sample-4',
     name: 'VID_20261011_ForestTrail_4K.mp4',
     url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    durationMs: 15000, // 0:15
-    sizeBytes: 15400000, // ~14.7 MB
+    durationMs: 15000,
+    sizeBytes: 15400000,
     folder: 'Camera',
     thumbnailUrl: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=500&auto=format&fit=crop&q=80',
     dateAdded: Date.now() - 1000 * 60 * 60 * 12,
@@ -80,5 +119,5 @@ export const INITIAL_VIDEOS: VideoEntry[] = [
     folder: 'Downloads',
     thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80',
     dateAdded: Date.now() - 1000 * 60 * 60 * 36,
-  }
+  },
 ];

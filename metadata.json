@@ -1,6 +1,6 @@
 {
   "name": "PixelFlow",
-  "description": "A minimal, elegant video player and media space inspired by NextPlayer, featuring folder organization, responsive video playback, gesture controls, and clean library browsing.",
+  "description": "A minimal, elegant video player and media space supporting Web, Android, Linux (Ubuntu, Fedora, AppImage, Flatpak), and Windows, featuring folder organization, responsive video playback, gesture controls, and clean library browsing.",
   "permissions": [],
   "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

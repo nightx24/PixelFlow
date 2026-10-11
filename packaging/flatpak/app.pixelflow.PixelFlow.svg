@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1D1E23"/>
+      <stop offset="100%" stop-color="#101114"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D8CCFF"/>
+      <stop offset="100%" stop-color="#C4B5FD"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background Squircle -->
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#bgGrad)" stroke="#26272D" stroke-width="8" filter="url(#shadow)"/>
+
+  <!-- Inner Media Frame -->
+  <rect x="80" y="80" width="352" height="352" rx="72" fill="#26272D" stroke="#34363F" stroke-width="4"/>
+
+  <!-- Play Symbol with Modern Fluid Geometry -->
+  <polygon points="210,170 350,256 210,342" fill="url(#accentGrad)" filter="url(#shadow)"/>
+
+  <!-- Subtle Accent Dot -->
+  <circle cx="370" cy="140" r="14" fill="#C4B5FD"/>
+</svg>

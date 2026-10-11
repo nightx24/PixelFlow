@@ -1,0 +1,80 @@
+name: PixelFlow Multi-Platform Desktop Builds
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Build Linux Packages (Ubuntu, Fedora, AppImage, Flatpak)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install system dependencies for AppImage, deb, and rpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm libarchive-tools flatpak flatpak-builder
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Web Bundle
+        run: npm run build
+
+      - name: Package Linux (AppImage & deb)
+        run: npx electron-builder --linux AppImage deb --publish never
+
+      - name: Package Fedora RPM
+        run: npx electron-builder --linux rpm --publish never
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixelflow-linux-packages
+          path: |
+            dist-desktop/*.AppImage
+            dist-desktop/*.deb
+            dist-desktop/*.rpm
+
+  build-windows:
+    name: Build Windows Packages (NSIS Installer & Portable)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build Web Bundle
+        run: npm run build
+
+      - name: Package Windows (NSIS & Portable)
+        run: npx electron-builder --win nsis portable --publish never
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixelflow-windows-packages
+          path: |
+            dist-desktop/*.exe

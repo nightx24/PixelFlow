@@ -1,15 +1,35 @@
 # PixelFlow
 
-A minimal video-player project targeting Linux and Android, inspired by NextPlayer and intended to use mpv/libmpv.
+A minimal, elegant video player and media space inspired by NextPlayer and mpv, rewritten in React + TypeScript with Tailwind CSS.
 
-## Current status
-This is the first scaffold, not a completed media player. The Android build produces a UI prototype APK; video playback, subtitle controls, resume position, playlists, media library, and native libmpv packaging still need implementation. No successful build is claimed until GitHub Actions completes.
+## Features
 
-## Android
-Requires JDK 17 and Android SDK 35. Run `gradle assembleDebug` or open in Android Studio.
+- **Your Video Space**: Clean dark aesthetic (`#101114`) with lavender accent styling (`#C4B5FD`).
+- **Media Library & Organization**:
+  - **Folders View**: Categorized video folders with video counts and drill-down navigation.
+  - **Videos View**: Full catalog with instant playback.
+  - **Grid & List Layouts**: Configurable media display layouts.
+  - **Instant Search**: Real-time filtering across video names and folder titles.
+- **Responsive Video Player**:
+  - Custom on-screen playback controls (play/pause, seek slider, ±10s jump, speed menu, volume, fit/fill mode, fullscreen).
+  - Status updates (`Now playing`, `Buffering…`, `Playback finished`).
+- **Flexible Media Sources**:
+  - Sample library with high-definition videos across categories.
+  - Device file upload (supports local `.mp4`, `.webm`, `.mov`, `.mkv`).
+  - Direct web video stream URL addition.
+- **Settings & Quick Settings**:
+  - Quick modal for switching between View modes (Tree, Folders, Videos) and Layout modes (List, Grid).
+  - Detailed settings panel for appearance, playback options, gesture guides, audio, and privacy info.
 
-## References
-- mpv/libmpv: https://github.com/mpv-player/mpv
-- UI inspiration: https://github.com/anilbeesetti/nextplayer
+## Development
 
-Before redistribution, review mpv's licensing and choose a license for PixelFlow itself.
+```bash
+npm install
+npm run dev
+```
+
+Build for production:
+
+```bash
+npm run build
+```

@@ -20,25 +20,19 @@ android {
         versionName = "0.1.1"
     }
 
-    // Optional stable signing for CI-generated test APKs. Configure GitHub Actions
-    // secrets to enable it; without them, Android's normal debug key is used.
-    val stableKeystore = System.getenv("PIXELFLOW_KEYSTORE_FILE")
-    val stableKeyAlias = System.getenv("PIXELFLOW_KEY_ALIAS")
-    val stableKeyPassword = System.getenv("PIXELFLOW_KEY_PASSWORD")
-    val stableStorePassword = System.getenv("PIXELFLOW_STORE_PASSWORD")
-
-    if (!stableKeystore.isNullOrBlank() &&
-        !stableKeyAlias.isNullOrBlank() &&
-        !stableKeyPassword.isNullOrBlank() &&
-        !stableStorePassword.isNullOrBlank()
-    ) {
-        signingConfigs.create("stable") {
-            storeFile = file(stableKeystore)
-            keyAlias = stableKeyAlias
-            keyPassword = stableKeyPassword
-            storePassword = stableStorePassword
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("${rootDir}/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
-        buildTypes.getByName("debug").signingConfig = signingConfigs.getByName("stable")
+    }
+
+    buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 }
 

@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-main: #101114;
+    --surface: #1D1E23;
+    --surface-alt: #26272D;
+    --accent: #C4B5FD;
+    --accent-ink: #241948;
+    --text-primary: #F5F4FA;
+    --muted: #A6A6B2;
+  }
+
+  body {
+    background-color: #101114;
+    color: #F5F4FA;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  }
+}
+
+/* Custom scrollbars matching the minimalist aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #26272D;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3B3D47;
+}
+
+/* Range input slider styling for video player and volume */
+input[type="range"] {
+  accent-color: #C4B5FD;
+}

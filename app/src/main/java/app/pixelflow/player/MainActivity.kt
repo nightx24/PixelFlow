@@ -49,7 +49,9 @@ class MainActivity : Activity() {
     private lateinit var folderBack: TextView
     private var player: ExoPlayer? = null
     private var allVideos: List<VideoEntry> = emptyList()
-    private var activeTab = "videos"
+    private var activeTab = "folders"
+    private var gridMode = false
+    private var searchVisible = false
     private var selectedFolder: String? = null
     private var searchQuery = ""
 
@@ -96,7 +98,19 @@ class MainActivity : Activity() {
             setPadding(1, dp(1), 0, 0)
         })
         toolbar.addView(brand, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        toolbar.addView(makeActionButton("+", "Open a video") { openVideoPicker() }, LinearLayout.LayoutParams(dp(46), dp(46)))
+        toolbar.addView(makeActionButton("⌕", "Search videos") {
+            searchVisible = !searchVisible
+            searchInput.visibility = if (searchVisible) View.VISIBLE else View.GONE
+            if (searchVisible) searchInput.requestFocus() else {
+                searchInput.setText("")
+                val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                imm.hideSoftInputFromWindow(searchInput.windowToken, 0)
+            }
+        }, LinearLayout.LayoutParams(dp(42), dp(46)))
+        toolbar.addView(makeActionButton("▦", "Quick settings") { showQuickSettings() },
+            LinearLayout.LayoutParams(dp(42), dp(46)))
+        toolbar.addView(makeActionButton("⚙", "Settings") { showSettings() },
+            LinearLayout.LayoutParams(dp(42), dp(46)))
         root.addView(toolbar)
 
         searchInput = EditText(this).apply {
@@ -111,7 +125,7 @@ class MainActivity : Activity() {
         }
         val searchParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50))
         searchParams.topMargin = dp(20)
-        root.addView(searchInput, searchParams)
+        searchInput.visibility = View.GONE\n        root.addView(searchInput, searchParams)
 
         val tabs = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -280,6 +294,78 @@ class MainActivity : Activity() {
         }
         allVideos = videos
         renderLibrary()
+    }
+
+    private fun showSettings() {
+        val options = arrayOf(
+            "Appearance\\nAdjust the app to your liking",
+            "Media library\\nScan and manage media library",
+            "Player\\nPlayer appearance, playback controls",
+            "Gestures\\nConfigure player touch gestures",
+            "Audio\\nAudio playback options",
+            "Subtitle\\nSubtitle appearance, playback options",
+            "General\\nUser data options",
+            "About\\nVersion, support, credits"
+        )
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Settings")
+            .setItems(options) { _, which ->
+                if (which == 1) loadLibrary()
+                else android.app.AlertDialog.Builder(this)
+                    .setTitle(options[which].substringBefore("\\n"))
+                    .setMessage(when (which) {
+                        0 -> "PixelFlow uses a dark theme with a lavender accent."
+                        2 -> "Playback controls are available on the video player."
+                        3 -> "Touch gestures can be configured in a future update."
+                        4 -> "Audio track selection is planned for a future update."
+                        5 -> "Subtitle controls are planned for a future update."
+                        6 -> "Your media stays on your device."
+                        else -> "PixelFlow video player"
+                    })
+                    .setPositiveButton("OK", null).show()
+            }.setNegativeButton("Close", null).show()
+    }
+
+    private fun showQuickSettings() {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+        }
+        fun addChoice(title: String, choices: List<String>, selected: String, onChoose: (String) -> Unit) {
+            content.addView(TextView(this).apply {
+                text = title
+                textSize = 14f
+                setTextColor(muted)
+                setPadding(0, dp(10), 0, dp(8))
+            })
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            choices.forEach { choice ->
+                val chip = TextView(this).apply {
+                    text = choice
+                    gravity = Gravity.CENTER
+                    textSize = 12f
+                    setTextColor(if (choice == selected) accentInk else textPrimary)
+                    background = roundedBackground(if (choice == selected) accent else surfaceAlt, dp(12))
+                    setPadding(dp(10), dp(10), dp(10), dp(10))
+                    setOnClickListener { onChoose(choice) }
+                }
+                row.addView(chip, LinearLayout.LayoutParams(0, dp(42), 1f).apply { marginEnd = dp(5) })
+            }
+            content.addView(row)
+        }
+        addChoice("Media view mode", listOf("Tree", "Folders", "Videos"), if (activeTab == "folders") "Folders" else "Videos") {
+            activeTab = if (it == "Videos") "videos" else "folders"
+            selectedFolder = null
+            renderLibrary()
+            showQuickSettings()
+        }
+        addChoice("Media layout", listOf("List", "Grid"), if (gridMode) "Grid" else "List") {
+            gridMode = it == "Grid"
+            android.app.AlertDialog.Builder(this).setTitle("Quick Settings").setView(content)
+                .setPositiveButton("Done", null).show()
+        }
+        android.app.AlertDialog.Builder(this).setTitle("Quick Settings").setView(content)
+            .setPositiveButton("Done", null).setNegativeButton("Cancel", null).show()
     }
 
     private fun renderLibrary() {

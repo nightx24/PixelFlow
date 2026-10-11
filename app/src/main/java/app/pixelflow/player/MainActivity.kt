@@ -102,7 +102,7 @@ class MainActivity : Activity() {
         searchInput = EditText(this).apply {
             hint = "Search videos and folders"
             textSize = 14f
-            singleLine = true
+            isSingleLine = true
             setTextColor(textPrimary)
             setHintTextColor(muted)
             setPadding(dp(15), 0, dp(12), 0)
